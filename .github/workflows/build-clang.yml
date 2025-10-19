@@ -19,58 +19,53 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: ubuntu:16.04
     steps:
-    - name: Install build dependencies
-      run: |
-        apt-get update
-        apt-get install -y --no-install-recommends \
-          build-essential \
-          ca-certificates \
-          cmake \
-          curl \
-          git \
-          libffi-dev \
-          libgdbm-dev \
-          libncurses5-dev \
-          libreadline-dev \
-          libsqlite3-dev \
-          libssl-dev \
-          libnss3-dev \
-          ninja-build \
-          wget \
-          zlib1g-dev
-    - name: Build and install Python
-      run: |
-        wget https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
-        tar -xf Python-3.8.18.tgz
-        cd Python-3.8.18
-        ./configure --enable-optimizations
-        make -j $(nproc)
-        make altinstall
+    - name: Cache Python installation
+      id: cache-python
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/python-install
+        key: ${{ runner.os }}-python-3.8.18
     - name: Checkout LLVM project
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: llvmorg-${{ github.event.inputs.clang-version }}
         path: llvm-project
-    - name: Configure and build Clang
-      shell: bash
+    - name: Build in Docker container
       run: |
-        cmake -S llvm-project/llvm -B build -G Ninja \
-          -DPYTHON_EXECUTABLE=/usr/local/bin/python3.8 \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DLLVM_ENABLE_PROJECTS="${{ github.event.inputs.llvm-projects }}" \
-          -DLLVM_TARGETS_TO_BUILD="${{ github.event.inputs.target-archs }}" \
-          -DCMAKE_INSTALL_PREFIX=/opt/clang \
-          -DLLVM_INCLUDE_TESTS=OFF \
-          -DLLVM_INCLUDE_EXAMPLES=OFF \
-          -DLLVM_INCLUDE_BENCHMARKS=OFF
-        cmake --build build --target install
-    - name: Package toolchain
-      run: |
-        tar -czf clang-toolchain.tar.gz -C /opt/clang .
+        docker run --rm -v ${{ github.workspace }}:/workspace ubuntu:16.04 /bin/bash -c "
+          set -eux
+          # Update and install dependencies
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential ca-certificates cmake curl git libffi-dev libgdbm-dev \
+            libncurses5-dev libreadline-dev libsqlite3-dev libssl-dev libnss3-dev \
+            ninja-build wget zlib1g-dev
+          # Build Python if not cached
+          if [ ! -f /workspace/python-install/bin/python3.8 ]; then
+            wget https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
+            tar -xf Python-3.8.18.tgz
+            cd Python-3.8.18
+            ./configure --enable-optimizations --prefix=/workspace/python-install
+            make -j \$(nproc)
+            make install
+            cd ..
+          fi
+          # Configure and build Clang
+          cmake -S /workspace/llvm-project/llvm -B /workspace/build -G Ninja \
+            -DPYTHON_EXECUTABLE=/workspace/python-install/bin/python3.8 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_ENABLE_PROJECTS='${{ github.event.inputs.llvm-projects }}' \
+            -DLLVM_TARGETS_TO_BUILD='${{ github.event.inputs.target-archs }}' \
+            -DCMAKE_INSTALL_PREFIX=/workspace/clang-install \
+            -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF
+          cmake --build /workspace/build --target install
+          # Package toolchain
+          tar -czf /workspace/clang-toolchain.tar.gz -C /workspace/clang-install .
+        "
     - name: Upload toolchain artifact
       uses: actions/upload-artifact@v4
       with:
