@@ -25,20 +25,30 @@ jobs:
     - name: Install build dependencies
       run: |
         apt-get update
-        # Install dependencies needed to add a PPA
-        apt-get install -y --no-install-recommends software-properties-common
-        # Add PPA for newer Python versions
-        add-apt-repository -y ppa:deadsnakes/ppa
-        apt-get update
-        # Install base build dependencies and a modern Python
         apt-get install -y --no-install-recommends \
           build-essential \
           ca-certificates \
           cmake \
+          curl \
           git \
+          libffi-dev \
+          libgdbm-dev \
+          libncurses5-dev \
+          libreadline-dev \
+          libsqlite3-dev \
+          libssl-dev \
+          libnss3-dev \
           ninja-build \
-          python3.8 \
-          wget
+          wget \
+          zlib1g-dev
+    - name: Build and install Python
+      run: |
+        wget https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
+        tar -xf Python-3.8.18.tgz
+        cd Python-3.8.18
+        ./configure --enable-optimizations
+        make -j $(nproc)
+        make altinstall
     - name: Checkout LLVM project
       uses: actions/checkout@v4
       with:
@@ -49,6 +59,7 @@ jobs:
       shell: bash
       run: |
         cmake -S llvm-project/llvm -B build -G Ninja \
+          -DPYTHON_EXECUTABLE=/usr/local/bin/python3.8 \
           -DCMAKE_BUILD_TYPE=Release \
           -DLLVM_ENABLE_PROJECTS="${{ github.event.inputs.llvm-projects }}" \
           -DLLVM_TARGETS_TO_BUILD="${{ github.event.inputs.target-archs }}" \
