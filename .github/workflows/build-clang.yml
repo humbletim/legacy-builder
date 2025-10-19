@@ -20,40 +20,53 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Cache Python installation
-      id: cache-python
-      uses: actions/cache@v4
-      with:
-        path: ${{ github.workspace }}/python-install
-        key: ${{ runner.os }}-python-3.8.18
     - name: Checkout LLVM project
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: llvmorg-${{ github.event.inputs.clang-version }}
         path: llvm-project
-    - name: Build in Docker container
+    - name: Cache Python installation
+      id: cache-python
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/python-install
+        key: ${{ runner.os }}-python-3.8.18
+    - name: Start builder container
       run: |
-        docker run --rm -v ${{ github.workspace }}:/workspace ubuntu:16.04 /bin/bash -c "
+        docker run -d --name builder \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace \
+          ubuntu:16.04 tail -f /dev/null
+    - name: Install dependencies in container
+      run: |
+        docker exec builder /bin/bash -c "
           set -eux
-          # Update and install dependencies
-          apt-get update
-          apt-get install -y --no-install-recommends \
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
             build-essential ca-certificates cmake curl git libffi-dev libgdbm-dev \
             libncurses5-dev libreadline-dev libsqlite3-dev libssl-dev libnss3-dev \
             ninja-build wget zlib1g-dev
-          # Build Python if not cached
-          if [ ! -f /workspace/python-install/bin/python3.8 ]; then
-            wget https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
-            tar -xf Python-3.8.18.tgz
-            cd Python-3.8.18
-            ./configure --enable-optimizations --prefix=/workspace/python-install
-            make -j \$(nproc)
-            make install
-            cd ..
-          fi
-          # Configure and build Clang
-          cmake -S /workspace/llvm-project/llvm -B /workspace/build -G Ninja \
+        "
+    - name: Build Python in container
+      if: steps.cache-python.outputs.cache-hit != 'true'
+      run: |
+        docker exec builder /bin/bash -c "
+          set -eux
+          wget -q https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
+          tar -xf Python-3.8.18.tgz
+          cd Python-3.8.18
+          ./configure --enable-optimizations --prefix=/workspace/python-install > /dev/null
+          make -j \$(nproc) > /dev/null
+          make install > /dev/null
+        "
+    - name: Build Clang in container
+      run: |
+        docker exec builder /bin/bash -c "
+          set -eux
+          mkdir -p /workspace/build
+          cd /workspace/build
+          cmake ../llvm-project/llvm -G Ninja \
             -DPYTHON_EXECUTABLE=/workspace/python-install/bin/python3.8 \
             -DCMAKE_BUILD_TYPE=Release \
             -DLLVM_ENABLE_PROJECTS='${{ github.event.inputs.llvm-projects }}' \
@@ -62,8 +75,11 @@ jobs:
             -DLLVM_INCLUDE_TESTS=OFF \
             -DLLVM_INCLUDE_EXAMPLES=OFF \
             -DLLVM_INCLUDE_BENCHMARKS=OFF
-          cmake --build /workspace/build --target install
-          # Package toolchain
+          cmake --build . --target install
+        "
+    - name: Package toolchain in container
+      run: |
+        docker exec builder /bin/bash -c "
           tar -czf /workspace/clang-toolchain.tar.gz -C /workspace/clang-install .
         "
     - name: Upload toolchain artifact
@@ -71,3 +87,8 @@ jobs:
       with:
         name: clang-toolchain-${{ github.event.inputs.clang-version }}
         path: clang-toolchain.tar.gz
+    - name: Stop builder container
+      if: always()
+      run: |
+        docker stop builder
+        docker rm builder
