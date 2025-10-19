@@ -40,7 +40,7 @@ jobs:
           python3.8 \
           wget
     - name: Checkout LLVM project
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: llvmorg-${{ github.event.inputs.clang-version }}
@@ -61,7 +61,7 @@ jobs:
       run: |
         tar -czf clang-toolchain.tar.gz -C /opt/clang .
     - name: Upload toolchain artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: clang-toolchain-${{ github.event.inputs.clang-version }}
         path: clang-toolchain.tar.gz
