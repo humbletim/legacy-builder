@@ -49,7 +49,6 @@ jobs:
 
   checkout-source:
     runs-on: ubuntu-latest
-    needs: prepare-builder
     steps:
       - name: Cache LLVM source
         uses: actions/cache@v4
@@ -68,35 +67,47 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [prepare-builder, checkout-source]
-    container:
-      image: ${{ needs.prepare-builder.outputs.image-tag }}
     steps:
       - name: Restore LLVM source from cache
         uses: actions/cache@v4
         with:
           path: llvm-project
           key: llvm-src-${{ github.event.inputs.clang-version }}
+      - name: Start builder container
+        run: |
+          docker pull ${{ needs.prepare-builder.outputs.image-tag }}
+          docker run -d --name builder \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ needs.prepare-builder.outputs.image-tag }} tail -f /dev/null
       - name: Build Clang
-        working-directory: /__w/legacy-clang-builder/legacy-clang-builder
         run: |
-          set -eux
-          mkdir build
-          cd build
-          cmake ../llvm-project/llvm -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_ENABLE_PROJECTS='${{ github.event.inputs.llvm-projects }}' \
-            -DLLVM_TARGETS_TO_BUILD='${{ github.event.inputs.target-archs }}' \
-            -DCMAKE_INSTALL_PREFIX=/opt/clang \
-            -DLLVM_INCLUDE_TESTS=OFF \
-            -DLLVM_INCLUDE_EXAMPLES=OFF \
-            -DLLVM_INCLUDE_BENCHMARKS=OFF
-          cmake --build . --target install
+          docker exec builder /bin/bash -c "
+            set -eux
+            mkdir build
+            cd build
+            cmake ../llvm-project/llvm -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_PROJECTS='${{ github.event.inputs.llvm-projects }}' \
+              -DLLVM_TARGETS_TO_BUILD='${{ github.event.inputs.target-archs }}' \
+              -DCMAKE_INSTALL_PREFIX=/opt/clang \
+              -DLLVM_INCLUDE_TESTS=OFF \
+              -DLLVM_INCLUDE_EXAMPLES=OFF \
+              -DLLVM_INCLUDE_BENCHMARKS=OFF
+            cmake --build . --target install
+          "
       - name: Package toolchain
-        working-directory: /__w/legacy-clang-builder/legacy-clang-builder
         run: |
-          tar -czf clang-toolchain.tar.gz -C /opt/clang .
+          docker exec builder /bin/bash -c "
+            tar -czf clang-toolchain.tar.gz -C /opt/clang .
+          "
       - name: Upload toolchain artifact
         uses: actions/upload-artifact@v4
         with:
           name: clang-toolchain-${{ github.event.inputs.clang-version }}-${{ runner.os }}
           path: clang-toolchain.tar.gz
+      - name: Stop builder container
+        if: always()
+        run: |
+          docker stop builder || true
+          docker rm builder || true
