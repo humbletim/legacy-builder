@@ -20,12 +20,12 @@ jobs:
     - name: 'Checkout code'
       uses: actions/checkout@v3
       with:
-        path: D:\_
+        path: _
 
-    # - name: 'Relocate to Mitigate LongPaths'
-    #   run: |
-    #     xcopy %GITHUB_WORKSPACE% D:\_
-    #   shell: cmd
+    - name: 'Relocate to Mitigate LongPaths'
+      run: |
+        move _ D:\
+      shell: cmd
 
     - name: 'Run wash.bash'
       run: |
