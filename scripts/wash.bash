@@ -10,7 +10,7 @@ case ${OS} in
   'Linux')
     PLATFORM='linux'
     ;;
-  'MINGW64_NT-10.0'*|'MSYS_NT-10.0'*)
+  'MINGW64_NT-10.0'|'MSYS_NT-10.0')
     PLATFORM='windows'
     ;;
   *)
@@ -91,6 +91,10 @@ mkdir -p android-sdk/cmdline-tools
 download_and_extract "$ANDROID_TOOLS_URL" "android-sdk/cmdline-tools/latest"
 echo "STEP 3 COMPLETE."
 
+# --- Activate the local toolchain for the rest of this script ---
+export JAVA_HOME="$(pwd)/jdk"
+export PATH="$(pwd)/node/bin:$(pwd)/jdk/bin:$PATH"
+
 echo "STEP 4: Installing Android SDK components..."
 # 4. Install Android SDK components
 ANDROID_CMD_TOOLS_PATH="android-sdk/cmdline-tools/latest/bin"
@@ -105,7 +109,7 @@ echo "Generating environment file..."
 (
     echo "export JAVA_HOME=$(pwd)/jdk"
     echo "export ANDROID_SDK_ROOT=$(pwd)/android-sdk"
-    echo "export PATH=$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/platform-tools:$(pwd)/android-sdk/cmdline-tools/bin:\$PATH"
+    echo "export PATH=$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/platform-tools:$(pwd)/android-sdk/cmdline-tools/latest/bin:\$PATH"
 ) > env
 
 echo "--- Wash Cycle Complete ---"
