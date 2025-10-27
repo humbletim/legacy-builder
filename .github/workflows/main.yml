@@ -26,19 +26,16 @@ jobs:
       shell: cmd
 
     - name: 'Run wash.bash'
-      working-directory: /d/_
       run: |
-        ./scripts/wash.bash
+        cd /d/_ && ./scripts/wash.bash
       shell: bash
 
     - name: 'Run rinse.bash'
-      working-directory: /d/_
       run: |
-        ./scripts/rinse.bash
+        cd /d/_ && ./scripts/rinse.bash
       shell: bash
 
     - name: 'Run repeat.bash'
-      working-directory: /d/_
       run: |
-        ./scripts/repeat.bash
+        cd /d/_ && ./scripts/repeat.bash
       shell: bash
