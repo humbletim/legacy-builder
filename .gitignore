@@ -1,0 +1,29 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Android
+.gradle/
+build/
+app/build/
+captures/
+*.apk
+*.ap_
+*.aab
+*.keystore
+
+# Local dependencies
+local/
+
+# Workspace
+workspace/
+
+# Distribution
+dist/
+
+# Other
+.idea/
+.vscode/
+*.iml
+*.DS_Store

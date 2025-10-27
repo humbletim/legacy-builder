@@ -1,0 +1,30 @@
+name: 'React Native Android CI'
+
+on:
+  push:
+    branches: [ feat/react-native ]
+  pull_request:
+    branches: [ feat/react-native ]
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+    - name: 'Checkout code'
+      uses: actions/checkout@v3
+
+    - name: 'Run wash.bash'
+      run: |
+        ./scripts/wash.bash
+      shell: bash
+
+    - name: 'Run rinse.bash'
+      run: |
+        ./scripts/rinse.bash
+      shell: bash
+
+    - name: 'Run repeat.bash'
+      run: |
+        ./scripts/repeat.bash
+      shell: bash
