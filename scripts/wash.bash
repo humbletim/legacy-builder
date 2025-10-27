@@ -10,7 +10,7 @@ case ${OS} in
   'Linux')
     PLATFORM='linux'
     ;;
-  'MINGW64_NT-10.0'|'MSYS_NT-10.0')
+  'MINGW64_NT-10.0'*|'MSYS_NT-10.0'*)
     PLATFORM='windows'
     ;;
   *)
