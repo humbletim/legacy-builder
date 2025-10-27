@@ -48,3 +48,8 @@ jobs:
         name: my-build-artifact
         path: /d/_/dist/AwesomeProject-debug.apk
         retention-days: 5 # Optional: specify how long to keep the artifactZ
+
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: true
