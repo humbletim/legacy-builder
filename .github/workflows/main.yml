@@ -41,3 +41,10 @@ jobs:
       run: |
         cd /d/_ && ./scripts/repeat.bash
       shell: bash
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: my-build-artifact
+        path: /d/_/dist/AwesomeProject-debug.apk
+        retention-days: 5 # Optional: specify how long to keep the artifactZ
