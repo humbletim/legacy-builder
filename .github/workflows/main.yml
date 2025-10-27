@@ -7,10 +7,6 @@ on:
     branches: [ feat/react-native ]
   workflow_dispatch:
 
-defaults:
-  run:
-    working-directory: D:\_
-
 jobs:
   build:
     runs-on: windows-2022
@@ -24,22 +20,25 @@ jobs:
     - name: 'Checkout code'
       uses: actions/checkout@v3
 
-    # - name: 'Relocate to Mitigate LongPaths'
-    #   run: |
-    #     mklink /D D:\_ %GITHUB_WORKSPACE%
-    #   shell: cmd
+    - name: 'Relocate to Mitigate LongPaths'
+      run: |
+        mklink /J D:\_ %GITHUB_WORKSPACE%
+      shell: cmd
 
     - name: 'Run wash.bash'
+      working-directory: /d/_
       run: |
         ./scripts/wash.bash
       shell: bash
 
     - name: 'Run rinse.bash'
+      working-directory: /d/_
       run: |
         ./scripts/rinse.bash
       shell: bash
 
     - name: 'Run repeat.bash'
+      working-directory: /d/_
       run: |
         ./scripts/repeat.bash
       shell: bash
