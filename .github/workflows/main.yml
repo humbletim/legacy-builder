@@ -46,7 +46,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: my-build-artifact
-        path: /d/_/dist/AwesomeProject-debug.apk
+        path: d:/_/dist/AwesomeProject-debug.apk
         retention-days: 5 # Optional: specify how long to keep the artifactZ
 
     - name: Setup tmate session
