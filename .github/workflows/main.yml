@@ -22,7 +22,7 @@ jobs:
 
     - name: 'Relocate to Mitigate LongPaths'
       run: |
-        mklink /J D:\_ %GITHUB_WORKSPACE%
+        move %GITHUB_WORKSPACE% D:\_
       shell: cmd
 
     - name: 'Run wash.bash'

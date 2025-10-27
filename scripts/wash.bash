@@ -111,7 +111,7 @@ echo "Generating environment file..."
     echo "export ANDROID_SDK_ROOT=$(pwd)/android-sdk"
     echo "export ANDROID_HOME=$(pwd)/android-sdk"
     echo "export PATH=$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/platform-tools:$(pwd)/android-sdk/cmdline-tools/latest/bin:\$PATH"
-) > env
+) | tee env
 
 echo "--- Wash Cycle Complete ---"
 echo "Ready for rinse.bash"
