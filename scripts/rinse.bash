@@ -26,6 +26,7 @@ if [ ! -d "workspace/AwesomeProject/android" ]; then
     echo "React Native project not found. Initializing..."
     # Clean the workspace directory before initializing
     rm -rf workspace/*
+    mkdir workspace
     (cd workspace && npx @react-native-community/cli init AwesomeProject)
 
     echo "Configuring project for src/ directory..."
