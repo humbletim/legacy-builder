@@ -22,17 +22,47 @@ if [ ! -f "$APK_PATH" ]; then
     exit 1
 fi
 
-# 3. Check for a connected device
-echo "Checking for connected devices..."
-if ! adb devices | grep -q "device$"; then
-    echo "Error: No device found."
-    echo "Please connect an Android device or start an emulator and ensure it's recognized by adb."
-    exit 1
+# 3. Set up the Android Virtual Device (AVD)
+AVD_NAME="shine-avd"
+echo "Checking for AVD '$AVD_NAME'..."
+if [ ! -d "$ANDROID_AVD_HOME/$AVD_NAME.avd" ]; then
+    echo "AVD not found. Creating..."
+    echo "no" | avdmanager --verbose create avd --name "$AVD_NAME" --package "system-images;android-31;default;x86_64" --device "pixel" --force
+else
+    echo "AVD found."
 fi
 
-# 4. Install the application
+# 4. Launch the emulator
+echo "Starting emulator..."
+emulator -avd "$AVD_NAME" -no-window -no-snapshot-load -wipe-data &
+EMULATOR_PID=$!
+
+# 5. Wait for the emulator to be ready
+echo "Waiting for emulator to boot..."
+adb wait-for-device
+while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
+    sleep 1
+done
+echo "Emulator booted."
+
+# 6. Unlock the screen
+adb shell input keyevent 82
+
+# 7. Install the application
 echo "Installing the application..."
 adb install -r "$APK_PATH"
 
+# 8. Launch the application
+echo "Launching the application..."
+adb shell am start -n com.awesomeproject/.MainActivity
+
+# 9. Smoke test
+echo "Running smoke test (waiting 10 seconds)..."
+sleep 10
+
+# 10. Shut down the emulator
+echo "Shutting down emulator..."
+adb emu kill
+
 echo "--- Shine Cycle Complete ---"
-echo "Success! The application has been installed on your device."
+echo "Success! The application was launched in the emulator."

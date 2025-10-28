@@ -101,7 +101,7 @@ ANDROID_CMD_TOOLS_PATH="android-sdk/cmdline-tools/latest/bin"
 echo "Accepting licenses..."
 yes | ./"$ANDROID_CMD_TOOLS_PATH/$SDK_MANAGER" --licenses > /dev/null
 echo "Installing SDK packages..."
-./"$ANDROID_CMD_TOOLS_PATH/$SDK_MANAGER" "platform-tools" "platforms;android-31" "build-tools;31.0.0" > /dev/null
+./"$ANDROID_CMD_TOOLS_PATH/$SDK_MANAGER" "platform-tools" "platforms;android-31" "build-tools;31.0.0" "emulator" "system-images;android-31;default;x86_64" > /dev/null
 echo "SDK packages installed."
 
 # 5. Create the environment file
@@ -110,7 +110,8 @@ echo "Generating environment file..."
     echo "export JAVA_HOME=$(pwd)/jdk"
     echo "export ANDROID_SDK_ROOT=$(pwd)/android-sdk"
     echo "export ANDROID_HOME=$(pwd)/android-sdk"
-    echo "export PATH=$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/platform-tools:$(pwd)/android-sdk/cmdline-tools/latest/bin:\$PATH"
+	echo "export ANDROID_AVD_HOME=$(pwd)/android-sdk/avd"
+    echo "export PATH=$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/platform-tools:$(pwd)/android-sdk/emulator:$(pwd)/android-sdk/cmdline-tools/latest/bin:\$PATH"
 ) | tee env
 
 echo "--- Wash Cycle Complete ---"

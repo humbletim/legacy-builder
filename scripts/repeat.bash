@@ -14,11 +14,15 @@ else
     exit 1
 fi
 
-# 2. Build the Android application
+# 2. Bundle the React Native code and assets
+echo "Bundling React Native code and assets..."
+(cd workspace/AwesomeProject && mkdir -p android/app/src/main/assets && npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res)
+
+# 3. Build the Android application
 echo "Building the Android application (debug)..."
 (cd workspace/AwesomeProject/android && ./gradlew assembleDebug)
 
-# 3. Copy the APK to the dist folder
+# 4. Copy the APK to the dist folder
 echo "Copying APK to dist folder..."
 mkdir -p dist
 APK_PATH="workspace/AwesomeProject/android/app/build/outputs/apk/debug/app-debug.apk"
