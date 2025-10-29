@@ -1,27 +1,105 @@
-import React from 'react';
-import {SafeAreaView, StatusBar, Text, useColorScheme} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { SafeAreaView, Button, StyleSheet, View, Text } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { pick, types } from '@react-native-documents/picker';
+import RNFS from 'react-native-fs'; // react-native-fs
 
 const App = () => {
-  const isDarkMode = useColorScheme() === 'dark';
+  // State to hold the HTML content, not a path
+  const [htmlContent, setHtmlContent] = useState(null);
+  const [baseUrl, setBaseUrl] = useState('');
+  const [error, setError] = useState(null);
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? '#333' : '#FFF',
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  };
+  useEffect(() => {
+    const testModePath = RNFS.DownloadDirectoryPath + '/test.html';
+    const checkTestFile = async () => {
+      if (await RNFS.exists(testModePath)) {
+        const content = await RNFS.readFile(testModePath, 'utf8');
+        setBaseUrl('file://' + testModePath);
+        setHtmlContent(content);
+      }
+    };
+    checkTestFile();
+  }, []);
 
-  const textStyle = {
-    color: isDarkMode ? '#FFF' : '#333',
-    fontSize: 24,
+  const loadHtmlFile = async () => {
+    setError(null); // Clear previous errors
+    try {
+      // 1. Let user pick an HTML file
+      const [result] = await pick({
+        type: [types.html],
+      });
+
+      // result.uri is the 'content://' path
+      const fileUri = result.uri;
+
+      // 2. Read the file's content from the URI
+      const content = await RNFS.readFile(fileUri, 'utf8');
+
+      // 3. Set the HTML content in state to trigger re-render
+      setBaseUrl(fileUri);
+      setHtmlContent(content);
+
+    } catch (err) {
+      if (err.code === 'DOCUMENT_PICKER_CANCELED') {
+        // User cancelled the picker
+        console.log('User cancelled picker');
+      } else {
+        // Handle other errors
+        console.error('Unknown Error: ', err);
+        setError('Failed to load file. Please try again.');
+      }
+    }
   };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <Text style={textStyle}>Hello, World!</Text>
+    <SafeAreaView style={styles.container}>
+      {/* This is a simple "main menu"
+        We show the button if no HTML is loaded.
+      */}
+      {!htmlContent ? (
+        <View style={styles.menu}>
+          <Text style={styles.title}>My Static App Viewer</Text>
+          <Button title="Load Local HTML File" onPress={loadHtmlFile} />
+          {error && <Text style={styles.errorText}>{error}</Text>}
+        </View>
+      ) : (
+        /* Once HTML is loaded, we show the WebView.
+          Note we use 'source={{ html: ... }}'
+        */
+        <WebView
+          originWhitelist={['*']} // Allows all origins
+          source={{ html: htmlContent, baseUrl: baseUrl }} // baseUrl is good practice
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          // Add props here for sensor access if your HTML needs it
+          // mediaPlaybackRequiresUserAction={false} // for <audio>
+          // geolocationEnabled={true} // for location
+        />
+      )}
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  menu: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  errorText: {
+    marginTop: 10,
+    color: 'red',
+  },
+});
 
 export default App;

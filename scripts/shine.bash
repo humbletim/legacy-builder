@@ -45,22 +45,31 @@ while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
 done
 echo "Emulator booted."
 
-# 6. Unlock the screen
+# 6. Push test file to device
+echo "Pushing test file to device..."
+adb push assets/test.html /sdcard/Download/test.html
+
+# 7. Unlock the screen
 adb shell input keyevent 82
 
-# 7. Install the application
+# 8. Install the application
 echo "Installing the application..."
 adb install -r "$APK_PATH"
 
-# 8. Launch the application
+# 9. Launch the application
 echo "Launching the application..."
 adb shell am start -n com.awesomeproject/.MainActivity
 
-# 9. Smoke test
-echo "Running smoke test (waiting 10 seconds)..."
+# 10. Smoke test & Verification
+echo "Running smoke test (waiting 10s for app to load)..."
 sleep 10
+echo "Taking screenshot for verification..."
+adb shell screencap -p /sdcard/shine-screenshot.png
+adb pull /sdcard/shine-screenshot.png dist/
+adb shell rm /sdcard/shine-screenshot.png
+echo "Screenshot saved to dist/shine-screenshot.png"
 
-# 10. Shut down the emulator
+# 11. Shut down the emulator
 echo "Shutting down emulator..."
 adb emu kill
 
