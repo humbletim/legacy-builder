@@ -87,21 +87,29 @@ EOL
 
     # --- Your existing setup continues below ---
 
-    # --- START NEW JAVA FIX ---
+# ... after the "--- END PINNING ---" EOL block ...
+    echo "Sub-project enforcement added."
+    # --- END NEW PINNING SCRIPT ---
+
+    # --- START NEW JAVA FIX (Corrected) ---
     echo "Fixing Java toolchain vs. compatibility conflict..."
     
-    # This is the other build file, inside the 'app' folder
-    APP_BUILD_GRADLE="workspace/AwesomeProject/android/app/build.gradle"
-
-    # The 'npx init' template adds BOTH toolchain and compileOptions,
-    # causing a conflict. We will remove the old 'compileOptions' block.
-    # This sed command finds the line 'compileOptions {' and deletes
-    # it and the 3 lines that follow it (the entire block).
-    if [ -f "$APP_BUILD_GRADLE" ]; then
-        sed -i -E "/compileOptions \{/,+3d" "$APP_BUILD_GRADLE"
-        echo "Removed conflicting compileOptions block from $APP_BUILD_GRADLE."
+    # The 'npx init' template adds BOTH toolchain and compileOptions
+    # to the ROOT build.gradle, causing a conflict.
+    # We will remove the old 'compileOptions' block from the
+    # ROOT build.gradle file.
+    #
+    # The $PROJECT_BUILD_GRADLE variable was already defined in the
+    # pinning script as:
+    # "workspace/AwesomeProject/android/build.gradle"
+    
+    if [ -f "$PROJECT_BUILD_GRADLE" ]; then
+        # This sed command finds 'compileOptions {' and deletes
+        # it and the 3 lines that follow it.
+        sed -i -E "/compileOptions \{/,+3d" "$PROJECT_BUILD_GRADLE"
+        echo "Removed conflicting compileOptions block from $PROJECT_BUILD_GRADLE."
     else
-        echo "Warning: $APP_BUILD_GRADLE not found, skipping Java fix."
+        echo "Warning: $PROJECT_BUILD_GRADLE not found, skipping Java fix."
     fi
     # --- END NEW JAVA FIX ---
 
