@@ -56,7 +56,7 @@ jobs:
 
     - name: Setup tmate session
       if: failure()
-      uses: humbletim/p373r-vrmod/nofrills-tmate@devtime
+      uses: humbletim/p373r-vrmod/.github/nofrills-tmate@devtime
       env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
