@@ -109,17 +109,46 @@ sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0" "emulato
 echo "SDK packages installed."
 
 # 5. Create the environment file
+# This script generates a portable environment file
+# Ensure the cache directories exist
+mkdir -p ./android-sdk
+mkdir -p ./android-data/avd
+mkdir -p ./gradle-cache
+mkdir -p ./maven-cache
+
 echo "Generating environment file..."
 (
+    # --- Java ---
     echo "export JAVA_HOME=$(pwd)/jdk"
+
+    # --- Android SDK Installation ---
+    # This is correct: where the SDK is INSTALLED
     echo "export ANDROID_HOME=$(pwd)/android-sdk"
     echo "export ANDROID_SDK_ROOT=$(pwd)/android-sdk"
-    echo "export ANDROID_SDK_HOME=$(pwd)/android-sdk"
-    echo "export ANDROID_AVD_HOME=$(pwd)/android-sdk/avd"
-    echo "export ANDROID_USER_HOME=$(pwd)/android-sdk/user"
-    echo "export GRADLE_USER_HOME=$(pwd)/android-sdk/user"
+
+    # --- Android User Data (THE FIX) ---
+    # MUST be a DIFFERENT directory from ANDROID_HOME.
+    # This is where the .android folder will be CREATED.
+    echo "export ANDROID_SDK_HOME=$(pwd)/android-data"
+    
+    # --- Redundant Overrides (Per your request) ---
+    # Pointing these inside our new data directory for maximum protection
+    echo "export ANDROID_AVD_HOME=$(pwd)/android-data/avd"
+    echo "export ANDROID_USER_HOME=$(pwd)/android-data" # Older var, good to set
+
+    # --- Gradle Cache ---
+    # Give Gradle its OWN cache directory, not the 'user' one
+    echo "export GRADLE_USER_HOME=$(pwd)/gradle-cache"
+
+    # --- Maven Cache (THE SECRET RECIPE) ---
+    # This overrides the C:\Users\...\.m2\repository default
+    echo "export GRADLE_OPTS=\"-Dmaven.repo.local=$(pwd)/maven-cache\""
+
+    # --- System Path ---
     echo "export PATH=$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/platform-tools:$(pwd)/android-sdk/emulator:$(pwd)/android-sdk/cmdline-tools/latest/bin:\$PATH"
+    
     if [ "$PLATFORM" == "windows" ]; then
+        # This exports the functions for Bash on Windows
         declare -xfp sdkmanager avdmanager
     fi
 ) | tee env
