@@ -91,7 +91,7 @@ echo "STEP 3 COMPLETE."
 
 # --- Activate the local toolchain for the rest of this script ---
 export JAVA_HOME="$(pwd)/jdk"
-export PATH="$(pwd)/node/bin:$(pwd)/jdk/bin:$PATH"
+export PATH="$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/cmdline-tools/latest/bin:$PATH"
 export ANDROID_HOME=$(pwd)/android-sdk
 
 if [ "$PLATFORM" == "windows" ]; then
@@ -105,7 +105,7 @@ echo "STEP 4: Installing Android SDK components..."
 echo "Accepting licenses..."
 yes | sdkmanager --licenses > /dev/null
 echo "Installing SDK packages..."
-sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0" "emulator" "system-images;android-31;default;x86_64" > /dev/null
+sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "emulator" "system-images;android-34;google_apis;x86_64" > /dev/null
 echo "SDK packages installed."
 
 # 5. Create the environment file
@@ -129,20 +129,20 @@ echo "Generating environment file..."
     # --- Android User Data (THE FIX) ---
     # MUST be a DIFFERENT directory from ANDROID_HOME.
     # This is where the .android folder will be CREATED.
-    echo "export ANDROID_SDK_HOME=$(pwd)/android-data"
+    # echo "export ANDROID_SDK_HOME=$(pwd)/android-data"
     
     # --- Redundant Overrides (Per your request) ---
     # Pointing these inside our new data directory for maximum protection
-    echo "export ANDROID_AVD_HOME=$(pwd)/android-data/avd"
-    echo "export ANDROID_USER_HOME=$(pwd)/android-data" # Older var, good to set
+    # echo "export ANDROID_AVD_HOME=$(pwd)/android-data/avd"
+    # echo "export ANDROID_USER_HOME=$(pwd)/android-data" # Older var, good to set
 
     # --- Gradle Cache ---
     # Give Gradle its OWN cache directory, not the 'user' one
-    echo "export GRADLE_USER_HOME=$(pwd)/gradle-cache"
+    # echo "export GRADLE_USER_HOME=$(pwd)/gradle-cache"
 
     # --- Maven Cache (THE SECRET RECIPE) ---
     # This overrides the C:\Users\...\.m2\repository default
-    echo "export GRADLE_OPTS=\"-Dmaven.repo.local=$(pwd)/maven-cache\""
+    # echo "export GRADLE_OPTS=\"-Dmaven.repo.local=$(pwd)/maven-cache\""
 
     # --- System Path ---
     echo "export PATH=$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/platform-tools:$(pwd)/android-sdk/emulator:$(pwd)/android-sdk/cmdline-tools/latest/bin:\$PATH"

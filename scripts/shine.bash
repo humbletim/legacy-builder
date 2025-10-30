@@ -27,7 +27,11 @@ AVD_NAME="shine-avd"
 echo "Checking for AVD '$AVD_NAME'..."
 if [ ! -d "$ANDROID_AVD_HOME/$AVD_NAME.avd" ]; then
     echo "AVD not found. Creating..."
-    echo "no" | avdmanager --verbose create avd --name "$AVD_NAME" --package "system-images;android-31;default;x86_64" --device "pixel" --force
+    timeout 60 echo "no" | avdmanager --verbose create avd --name "$AVD_NAME" --package "system-images;android-34;google_apis;x86_64" --device "pixel" --force || true
+    if [ ! -d "$ANDROID_AVD_HOME/$AVD_NAME.avd" ]; then
+        echo "Error: AVD creation failed or timed out."
+        exit 1
+    fi
 else
     echo "AVD found."
 fi

@@ -7,7 +7,9 @@ echo "--- Starting Repeat Cycle ---"
 
 cleanup_function() {
   echo "Script is exiting. Performing cleanup..."
-  taskkill -IM java.exe -f || true
+  if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+    taskkill -IM java.exe -f || true
+  fi
   echo "Cleanup complete."
 }
 

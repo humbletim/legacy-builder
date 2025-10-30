@@ -21,88 +21,13 @@ command -v java >/dev/null 2>&1 || { echo >&2 "Java not found. Aborting."; exit 
 command -v adb >/dev/null 2>&1 || { echo >&2 "Android Debug Bridge (adb) not found. Aborting."; exit 1; }
 echo "Toolchain verified."
 
-# 3. Initialize React Native project if it doesn't exist
-# [SOURCE 8]
-# 3. Initialize React Native project if it doesn't exist
-if [ ! -d "workspace/AwesomeProject/android" ];
-then
-    echo "React Native project not found. Initializing..."
-    # Clean the workspace directory before initializing
-    rm -rf workspace/*
-    mkdir workspace
-    (cd workspace && npx @react-native-community/cli init AwesomeProject)
+# 3. Initialize React Native project
+echo "Initializing fresh React Native project..."
+rm -rf workspace
+mkdir -p workspace
+(cd workspace && npx @react-native-community/cli init AwesomeProject)
 
-# --- START NEW PINNING SCRIPT (Corrected) ---
-    echo "Pinning Gradle project to match wash.bash settings (SDK 31)..."
-
-    # Define the pinned versions from wash.bash
-    PINNED_SDK_VERSION=31
-    PINNED_BUILD_TOOLS_VERSION="31.0.0"
-    
-    # Define compatible AGP/Gradle/Kotlin versions that work with SDK 31
-    PINNED_AGP_VERSION="7.4.2"
-    PINNED_GRADLE_VERSION="7.6.3"
-    PINNED_KOTLIN_VERSION="1.8.20"
-
-    # Define the project file paths
-    PROJECT_BUILD_GRADLE="workspace/AwesomeProject/android/build.gradle"
-    WRAPPER_PROPERTIES="workspace/AwesomeProject/android/gradle/wrapper/gradle-wrapper.properties"
-
-    # 1. Pin SDK versions (This part was already working)
-    echo "Pinning SDK versions to $PINNED_SDK_VERSION..."
-    sed -i -E "s/compileSdkVersion = [0-9]+/compileSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
-    sed -i -E "s/targetSdkVersion = [0-9]+/targetSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
-    sed -i -E "s/buildToolsVersion = \"[0-9.]+\"/buildToolsVersion = \"$PINNED_BUILD_TOOLS_VERSION\"/" "$PROJECT_BUILD_GRADLE"
-
-    # 2. (THE REAL FIX) Pin AGP version by editing the 'classpath' line
-    echo "Pinning AGP to $PINNED_AGP_VERSION..."
-    sed -i "s/classpath(\"com.android.tools.build:gradle\")/classpath(\"com.android.tools.build:gradle:$PINNED_AGP_VERSION\")/" "$PROJECT_BUILD_GRADLE"
-
-    # 3. (THE REAL FIX) Pin Kotlin plugin version by editing the 'classpath' line
-    echo "Pinning Kotlin plugin to $PINNED_KOTLIN_VERSION..."
-    sed -i "s/classpath(\"org.jetbrains.kotlin:kotlin-gradle-plugin\")/classpath(\"org.jetbrains.kotlin:kotlin-gradle-plugin:$PINNED_KOTLIN_VERSION\")/" "$PROJECT_BUILD_GRADLE"
-
-    # 4. (THE REAL FIX) Pin Kotlin *language* version in the 'ext' block
-    echo "Pinning Kotlin language version to $PINNED_KOTLIN_VERSION..."
-    sed -i -E "s/kotlinVersion = \"[0-9.]+\"/kotlinVersion = \"$PINNED_KOTLIN_VERSION\"/" "$PROJECT_BUILD_GRADLE"
-
-    # 5. Pin Gradle Wrapper (This part was also working)
-    echo "Pinning Gradle Wrapper to $PINNED_GRADLE_VERSION..."
-    sed -i -E "s/gradle-[0-9.]+(.*).zip/gradle-$PINNED_GRADLE_VERSION-all.zip/" "$WRAPPER_PROPERTIES"
-
-    echo "Versions pinned."
-
-    # 6. Your subproject enforcer (This was always correct)
-    echo "Enforcing version consistency across all sub-projects..."
-    cat >> "$PROJECT_BUILD_GRADLE" << EOL
-
-// --- START PINNING (Added by rinse.bash) ---
-subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            android {
-                compileSdkVersion rootProject.ext.compileSdkVersion
-                buildToolsVersion rootProject.ext.buildToolsVersion
-            }
-        }
-    }
-}
-// --- END PINNING ---
-EOL
-    echo "Sub-project enforcement added."
-
-    # 7. (Just in case) Remove the 'compileOptions' block that my
-    #    previous failed theories tried to remove.
-    echo "Fixing Java toolchain vs. compatibility conflict..."
-    if [ -f "$PROJECT_BUILD_GRADLE" ]; then
-        sed -i '/compileOptions {/,/}/d' "$PROJECT_BUILD_GRADLE"
-        echo "Removed any conflicting compileOptions block from $PROJECT_BUILD_GRADLE."
-    fi
-    # --- END NEW PINNING SCRIPT ---
-
-
-        
-    echo "Configuring project for src/ directory..."
+echo "Configuring project for src/ directory..."
     # Update metro.config.js
     # [SOURCE 10]
     cat > workspace/AwesomeProject/metro.config.js << EOL
@@ -155,9 +80,6 @@ EOL
     echo "Installing additional dependencies..."
     (cd workspace/AwesomeProject && npm install --save-dev babel-plugin-module-resolver)
     (cd workspace/AwesomeProject && npm install --save react-native-webview @react-native-documents/picker react-native-fs)
-else
-    echo "React Native project found. Skipping initialization."
-fi
 # [SOURCE 15]
 
 # 4. Install Node.js dependencies
