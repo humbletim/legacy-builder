@@ -95,8 +95,8 @@ export PATH="$(pwd)/node/bin:$(pwd)/jdk/bin:$PATH"
 export ANDROID_HOME=$(pwd)/android-sdk
 
 if [ "$PLATFORM" == "windows" ]; then
-    function sdkmanager(){ . local/env ; $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat $* ; }
-    function avdmanager(){ . local/env ; $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager.bat $* ; }
+    function sdkmanager(){ test -s local/env && . local/env ; $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat $* ; }
+    function avdmanager(){ test -s local/env && . local/env ; $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager.bat $* ; }
     declare -xf sdkmanager avdmanager
 fi
 
