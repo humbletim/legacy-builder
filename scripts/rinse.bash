@@ -29,6 +29,53 @@ if [ ! -d "workspace/AwesomeProject/android" ]; then
     mkdir workspace
     (cd workspace && npx @react-native-community/cli init AwesomeProject)
 
+
+    # --- START NEW PINNING SCRIPT ---
+    echo "Pinning Gradle project to match wash.bash settings (SDK 31)..."
+
+    # Define the pinned versions from wash.bash
+    PINNED_SDK_VERSION=31
+    PINNED_BUILD_TOOLS_VERSION="31.0.0"
+
+    # Define the project's build.gradle path
+    PROJECT_BUILD_GRADLE="workspace/AwesomeProject/android/build.gradle"
+
+    # Use sed to find/replace the default RN versions with YOUR pinned versions
+    # This edits the ext { ... } block in android/build.gradle
+    sed -i -E "s/compileSdkVersion = [0-9]+/compileSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
+    sed -i -E "s/targetSdkVersion = [0-9]+/targetSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
+    sed -i -E "s/buildToolsVersion = \"[0-9.]+\"/buildToolsVersion = \"$PINNED_BUILD_TOOLS_VERSION\"/" "$PROJECT_BUILD_GRADLE"
+
+    echo "Versions pinned in $PROJECT_BUILD_GRADLE."
+
+    echo "Enforcing version consistency across all sub-projects (react-native-fs)..."
+    
+    # This is the real pin. It bullies react-native-fs and all other
+    # native modules into using YOUR SDK 31, not their own.
+    # We append this to the end of android/build.gradle
+    cat >> "$PROJECT_BUILD_GRADLE" << EOL
+
+// --- START PINNING (Added by rinse.bash) ---
+// Force all sub-projects (like react-native-fs) to use the
+// root project's SDK versions, which we just pinned to SDK 31.
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            android {
+                compileSdkVersion rootProject.ext.compileSdkVersion
+                buildToolsVersion rootProject.ext.buildToolsVersion
+            }
+        }
+    }
+}
+// --- END PINNING ---
+EOL
+    echo "Sub-project enforcement added."
+    # --- END NEW PINNING SCRIPT ---
+
+
+
+
     echo "Configuring project for src/ directory..."
     # Update metro.config.js
     cat > workspace/AwesomeProject/metro.config.js << EOL
