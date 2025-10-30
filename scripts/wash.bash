@@ -28,12 +28,10 @@ if [ "$PLATFORM" == "windows" ]; then
     NODE_URL="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-win-x64.zip"
     JDK_URL="https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip"
     ANDROID_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-win-${ANDROID_TOOLS_VERSION}_latest.zip"
-    SDK_MANAGER="sdkmanager.bat"
 else # linux
     NODE_URL="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"
     JDK_URL="https://aka.ms/download-jdk/microsoft-jdk-17-linux-x64.tar.gz"
     ANDROID_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_TOOLS_VERSION}_latest.zip"
-    SDK_MANAGER="sdkmanager"
 fi
 
 # --- Helper Functions ---
@@ -94,24 +92,36 @@ echo "STEP 3 COMPLETE."
 # --- Activate the local toolchain for the rest of this script ---
 export JAVA_HOME="$(pwd)/jdk"
 export PATH="$(pwd)/node/bin:$(pwd)/jdk/bin:$PATH"
+export ANDROID_HOME=$(pwd)/android-sdk
+
+if [ "$PLATFORM" == "windows" ]; then
+    function sdkmanager(){ . local/env ; $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager.bat $* ; }
+    function avdmanager(){ . local/env ; $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager.bat $* ; }
+    declare -xf sdkmanager avdmanager
+fi
 
 echo "STEP 4: Installing Android SDK components..."
 # 4. Install Android SDK components
-ANDROID_CMD_TOOLS_PATH="android-sdk/cmdline-tools/latest/bin"
 echo "Accepting licenses..."
-yes | ./"$ANDROID_CMD_TOOLS_PATH/$SDK_MANAGER" --licenses > /dev/null
+yes | sdkmanager --licenses > /dev/null
 echo "Installing SDK packages..."
-./"$ANDROID_CMD_TOOLS_PATH/$SDK_MANAGER" "platform-tools" "platforms;android-31" "build-tools;31.0.0" "emulator" "system-images;android-31;default;x86_64" > /dev/null
+sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0" "emulator" "system-images;android-31;default;x86_64" > /dev/null
 echo "SDK packages installed."
 
 # 5. Create the environment file
 echo "Generating environment file..."
 (
     echo "export JAVA_HOME=$(pwd)/jdk"
-    echo "export ANDROID_SDK_ROOT=$(pwd)/android-sdk"
     echo "export ANDROID_HOME=$(pwd)/android-sdk"
-	echo "export ANDROID_AVD_HOME=$(pwd)/android-sdk/avd"
+    echo "export ANDROID_SDK_ROOT=$(pwd)/android-sdk"
+    echo "export ANDROID_SDK_HOME=$(pwd)/android-sdk"
+    echo "export ANDROID_AVD_HOME=$(pwd)/android-sdk/avd"
+    echo "export ANDROID_USER_HOME=$(pwd)/android-sdk/user"
+    echo "export GRADLE_USER_HOME=$(pwd)/android-sdk/user"
     echo "export PATH=$(pwd)/node/bin:$(pwd)/jdk/bin:$(pwd)/android-sdk/platform-tools:$(pwd)/android-sdk/emulator:$(pwd)/android-sdk/cmdline-tools/latest/bin:\$PATH"
+    if [ "$PLATFORM" == "windows" ]; then
+        declare -xfp sdkmanager avdmanager
+    fi
 ) | tee env
 
 echo "--- Wash Cycle Complete ---"
