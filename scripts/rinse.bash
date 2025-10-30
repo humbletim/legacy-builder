@@ -46,6 +46,15 @@ if [ ! -d "workspace/AwesomeProject/android" ]; then
     sed -i -E "s/targetSdkVersion = [0-9]+/targetSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
     sed -i -E "s/buildToolsVersion = \"[0-9.]+\"/buildToolsVersion = \"$PINNED_BUILD_TOOLS_VERSION\"/" "$PROJECT_BUILD_GRADLE"
 
+    # 2. (NEW) Downgrade the Android Gradle Plugin (AGP)
+    echo "Pinning AGP to $PINNED_AGP_VERSION..."
+    sed -i -E "s/classpath \"com.android.tools.build:gradle:[0-9.]+\"/classpath \"com.android.tools.build:gradle:$PINNED_AGP_VERSION\"/" "$PROJECT_BUILD_GRADLE"
+
+    # 3. (NEW) Downgrade the Gradle Wrapper
+    echo "Pinning Gradle Wrapper to $PINNED_GRADLE_VERSION..."
+    sed -i -E "s/gradle-[0-9.]+-all.zip/gradle-$PINNED_GRADLE_VERSION-all.zip/" "$WRAPPER_PROPERTIES"
+
+
     echo "Versions pinned in $PROJECT_BUILD_GRADLE."
 
     echo "Enforcing version consistency across all sub-projects (react-native-fs)..."
