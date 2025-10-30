@@ -32,50 +32,51 @@ then
     mkdir workspace
     (cd workspace && npx @react-native-community/cli init AwesomeProject)
 
-    # --- START NEW PINNING SCRIPT (Corrected) ---
+# --- START NEW PINNING SCRIPT (Corrected) ---
     echo "Pinning Gradle project to match wash.bash settings (SDK 31)..."
 
     # Define the pinned versions from wash.bash
     PINNED_SDK_VERSION=31
     PINNED_BUILD_TOOLS_VERSION="31.0.0"
-    PINNED_KOTLIN_VERSION="1.8.20" # <-- ADD THIS LINE
-
-    # Define compatible AGP/Gradle versions that work with SDK 31
+    
+    # Define compatible AGP/Gradle/Kotlin versions that work with SDK 31
     PINNED_AGP_VERSION="7.4.2"
-    PINNED_GRADLE_VERSION="7.6.3" # This is a known-good Gradle version for AGP 7.4.x
+    PINNED_GRADLE_VERSION="7.6.3"
+    PINNED_KOTLIN_VERSION="1.8.20"
 
     # Define the project file paths
     PROJECT_BUILD_GRADLE="workspace/AwesomeProject/android/build.gradle"
     WRAPPER_PROPERTIES="workspace/AwesomeProject/android/gradle/wrapper/gradle-wrapper.properties"
 
-    # 1. Pin SDK versions (Targets the 'ext' block)
+    # 1. Pin SDK versions (This part was already working)
     echo "Pinning SDK versions to $PINNED_SDK_VERSION..."
     sed -i -E "s/compileSdkVersion = [0-9]+/compileSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
     sed -i -E "s/targetSdkVersion = [0-9]+/targetSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
     sed -i -E "s/buildToolsVersion = \"[0-9.]+\"/buildToolsVersion = \"$PINNED_BUILD_TOOLS_VERSION\"/" "$PROJECT_BUILD_GRADLE"
 
-    # 2. (CORRECTED) Pin AGP version (Targets the 'agpVersion' var in the 'ext' block)
+    # 2. (THE REAL FIX) Pin AGP version by editing the 'classpath' line
     echo "Pinning AGP to $PINNED_AGP_VERSION..."
-    sed -i -E "s/agpVersion = \"[0-9.]+\"/agpVersion = \"$PINNED_AGP_VERSION\"/" "$PROJECT_BUILD_GRADLE"
+    sed -i "s/classpath(\"com.android.tools.build:gradle\")/classpath(\"com.android.tools.build:gradle:$PINNED_AGP_VERSION\")/" "$PROJECT_BUILD_GRADLE"
 
-    # 3. (CORRECTED) Pin Gradle Wrapper version (Matches any version/suffix like -bin.zip)
+    # 3. (THE REAL FIX) Pin Kotlin plugin version by editing the 'classpath' line
+    echo "Pinning Kotlin plugin to $PINNED_KOTLIN_VERSION..."
+    sed -i "s/classpath(\"org.jetbrains.kotlin:kotlin-gradle-plugin\")/classpath(\"org.jetbrains.kotlin:kotlin-gradle-plugin:$PINNED_KOTLIN_VERSION\")/" "$PROJECT_BUILD_GRADLE"
+
+    # 4. (THE REAL FIX) Pin Kotlin *language* version in the 'ext' block
+    echo "Pinning Kotlin language version to $PINNED_KOTLIN_VERSION..."
+    sed -i -E "s/kotlinVersion = \"[0-9.]+\"/kotlinVersion = \"$PINNED_KOTLIN_VERSION\"/" "$PROJECT_BUILD_GRADLE"
+
+    # 5. Pin Gradle Wrapper (This part was also working)
     echo "Pinning Gradle Wrapper to $PINNED_GRADLE_VERSION..."
     sed -i -E "s/gradle-[0-9.]+(.*).zip/gradle-$PINNED_GRADLE_VERSION-all.zip/" "$WRAPPER_PROPERTIES"
 
-    # --- ADD THIS NEW SED COMMAND ---
-    echo "Pinning Kotlin to $PINNED_KOTLIN_VERSION..."
-    sed -i -E "s/kotlinVersion = \"[0-9.]+\"/kotlinVersion = \"$PINNED_KOTLIN_VERSION\"/" "$PROJECT_BUILD_GRADLE"
-    # --- END OF NEW COMMAND ---
-
     echo "Versions pinned."
 
+    # 6. Your subproject enforcer (This was always correct)
     echo "Enforcing version consistency across all sub-projects..."
-    # 4. Your subproject enforcer (Appends to the end of the file)
     cat >> "$PROJECT_BUILD_GRADLE" << EOL
 
 // --- START PINNING (Added by rinse.bash) ---
-// Force all sub-projects (like react-native-fs) to use the
-// root project's SDK versions, which we just pinned to SDK 31.
 subprojects {
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
@@ -89,35 +90,16 @@ subprojects {
 // --- END PINNING ---
 EOL
     echo "Sub-project enforcement added."
-    # --- END NEW PINNING SCRIPT ---
 
-    # --- Your existing setup continues below ---
-
-# ... after the "--- END PINNING ---" EOL block ...
-    echo "Sub-project enforcement added."
-    # --- END NEW PINNING SCRIPT ---
-
-    # --- START NEW JAVA FIX (Corrected) ---
+    # 7. (Just in case) Remove the 'compileOptions' block that my
+    #    previous failed theories tried to remove.
     echo "Fixing Java toolchain vs. compatibility conflict..."
-    
-    # The 'npx init' template adds BOTH toolchain and compileOptions
-    # to the ROOT build.gradle, causing a conflict.
-    # We will remove the old 'compileOptions' block from the
-    # ROOT build.gradle file.
-    #
-    # The $PROJECT_BUILD_GRADLE variable was already defined in the
-    # pinning script as:
-    # "workspace/AwesomeProject/android/build.gradle"
-    
     if [ -f "$PROJECT_BUILD_GRADLE" ]; then
-        # This sed command finds 'compileOptions {' and deletes
-        # it and the 3 lines that follow it.
-        sed -i -E "/compileOptions \{/,+3d" "$PROJECT_BUILD_GRADLE"
-        echo "Removed conflicting compileOptions block from $PROJECT_BUILD_GRADLE."
-    else
-        echo "Warning: $PROJECT_BUILD_GRADLE not found, skipping Java fix."
+        sed -i '/compileOptions {/,/}/d' "$PROJECT_BUILD_GRADLE"
+        echo "Removed any conflicting compileOptions block from $PROJECT_BUILD_GRADLE."
     fi
-    # --- END NEW JAVA FIX ---
+    # --- END NEW PINNING SCRIPT ---
+
 
         
     echo "Configuring project for src/ directory..."

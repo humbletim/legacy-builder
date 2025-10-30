@@ -5,7 +5,7 @@ set -e
 
 echo "--- Starting Repeat Cycle ---"
 
-cleanup() {
+cleanup_function() {
   echo "Script is exiting. Performing cleanup..."
   taskkill -IM java.exe -f || true
   echo "Cleanup complete."
