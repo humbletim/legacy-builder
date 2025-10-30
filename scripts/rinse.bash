@@ -38,7 +38,8 @@ then
     # Define the pinned versions from wash.bash
     PINNED_SDK_VERSION=31
     PINNED_BUILD_TOOLS_VERSION="31.0.0"
-    
+    PINNED_KOTLIN_VERSION="1.8.20" # <-- ADD THIS LINE
+
     # Define compatible AGP/Gradle versions that work with SDK 31
     PINNED_AGP_VERSION="7.4.2"
     PINNED_GRADLE_VERSION="7.6.3" # This is a known-good Gradle version for AGP 7.4.x
@@ -60,6 +61,11 @@ then
     # 3. (CORRECTED) Pin Gradle Wrapper version (Matches any version/suffix like -bin.zip)
     echo "Pinning Gradle Wrapper to $PINNED_GRADLE_VERSION..."
     sed -i -E "s/gradle-[0-9.]+(.*).zip/gradle-$PINNED_GRADLE_VERSION-all.zip/" "$WRAPPER_PROPERTIES"
+
+    # --- ADD THIS NEW SED COMMAND ---
+    echo "Pinning Kotlin to $PINNED_KOTLIN_VERSION..."
+    sed -i -E "s/kotlinVersion = \"[0-9.]+\"/kotlinVersion = \"$PINNED_KOTLIN_VERSION\"/" "$PROJECT_BUILD_GRADLE"
+    # --- END OF NEW COMMAND ---
 
     echo "Versions pinned."
 
