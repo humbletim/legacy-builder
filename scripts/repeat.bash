@@ -5,6 +5,13 @@ set -e
 
 echo "--- Starting Repeat Cycle ---"
 
+cleanup() {
+  echo "Script is exiting. Performing cleanup..."
+  taskkill -IM java.exe -f || true
+  echo "Cleanup complete."
+}
+
+trap cleanup_function EXIT
 # 1. Source the environment file to bring in the local toolchain
 echo "Activating local toolchain..."
 if [ -f "local/env" ]; then
