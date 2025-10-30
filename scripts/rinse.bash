@@ -22,46 +22,49 @@ command -v adb >/dev/null 2>&1 || { echo >&2 "Android Debug Bridge (adb) not fou
 echo "Toolchain verified."
 
 # 3. Initialize React Native project if it doesn't exist
-if [ ! -d "workspace/AwesomeProject/android" ]; then
+# [SOURCE 8]
+# 3. Initialize React Native project if it doesn't exist
+if [ ! -d "workspace/AwesomeProject/android" ];
+then
     echo "React Native project not found. Initializing..."
     # Clean the workspace directory before initializing
     rm -rf workspace/*
     mkdir workspace
     (cd workspace && npx @react-native-community/cli init AwesomeProject)
 
-
-    # --- START NEW PINNING SCRIPT ---
+    # --- START NEW PINNING SCRIPT (Corrected) ---
     echo "Pinning Gradle project to match wash.bash settings (SDK 31)..."
 
     # Define the pinned versions from wash.bash
     PINNED_SDK_VERSION=31
     PINNED_BUILD_TOOLS_VERSION="31.0.0"
+    
+    # Define compatible AGP/Gradle versions that work with SDK 31
+    PINNED_AGP_VERSION="7.4.2"
+    PINNED_GRADLE_VERSION="7.6.3" # This is a known-good Gradle version for AGP 7.4.x
 
-    # Define the project's build.gradle path
+    # Define the project file paths
     PROJECT_BUILD_GRADLE="workspace/AwesomeProject/android/build.gradle"
+    WRAPPER_PROPERTIES="workspace/AwesomeProject/android/gradle/wrapper/gradle-wrapper.properties"
 
-    # Use sed to find/replace the default RN versions with YOUR pinned versions
-    # This edits the ext { ... } block in android/build.gradle
+    # 1. Pin SDK versions (Targets the 'ext' block)
+    echo "Pinning SDK versions to $PINNED_SDK_VERSION..."
     sed -i -E "s/compileSdkVersion = [0-9]+/compileSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
     sed -i -E "s/targetSdkVersion = [0-9]+/targetSdkVersion = $PINNED_SDK_VERSION/" "$PROJECT_BUILD_GRADLE"
     sed -i -E "s/buildToolsVersion = \"[0-9.]+\"/buildToolsVersion = \"$PINNED_BUILD_TOOLS_VERSION\"/" "$PROJECT_BUILD_GRADLE"
 
-    # 2. (NEW) Downgrade the Android Gradle Plugin (AGP)
+    # 2. (CORRECTED) Pin AGP version (Targets the 'agpVersion' var in the 'ext' block)
     echo "Pinning AGP to $PINNED_AGP_VERSION..."
-    sed -i -E "s/classpath \"com.android.tools.build:gradle:[0-9.]+\"/classpath \"com.android.tools.build:gradle:$PINNED_AGP_VERSION\"/" "$PROJECT_BUILD_GRADLE"
+    sed -i -E "s/agpVersion = \"[0-9.]+\"/agpVersion = \"$PINNED_AGP_VERSION\"/" "$PROJECT_BUILD_GRADLE"
 
-    # 3. (NEW) Downgrade the Gradle Wrapper
+    # 3. (CORRECTED) Pin Gradle Wrapper version (Matches any version/suffix like -bin.zip)
     echo "Pinning Gradle Wrapper to $PINNED_GRADLE_VERSION..."
-    sed -i -E "s/gradle-[0-9.]+-all.zip/gradle-$PINNED_GRADLE_VERSION-all.zip/" "$WRAPPER_PROPERTIES"
+    sed -i -E "s/gradle-[0-9.]+(.*).zip/gradle-$PINNED_GRADLE_VERSION-all.zip/" "$WRAPPER_PROPERTIES"
 
+    echo "Versions pinned."
 
-    echo "Versions pinned in $PROJECT_BUILD_GRADLE."
-
-    echo "Enforcing version consistency across all sub-projects (react-native-fs)..."
-    
-    # This is the real pin. It bullies react-native-fs and all other
-    # native modules into using YOUR SDK 31, not their own.
-    # We append this to the end of android/build.gradle
+    echo "Enforcing version consistency across all sub-projects..."
+    # 4. Your subproject enforcer (Appends to the end of the file)
     cat >> "$PROJECT_BUILD_GRADLE" << EOL
 
 // --- START PINNING (Added by rinse.bash) ---
@@ -82,11 +85,11 @@ EOL
     echo "Sub-project enforcement added."
     # --- END NEW PINNING SCRIPT ---
 
-
-
-
+    # --- Your existing setup continues below ---
+    
     echo "Configuring project for src/ directory..."
     # Update metro.config.js
+    # [SOURCE 10]
     cat > workspace/AwesomeProject/metro.config.js << EOL
 const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 const path = require('path');
@@ -102,7 +105,6 @@ const config = {
   },
   projectRoot: path.resolve(__dirname),
 };
-
 module.exports = mergeConfig(getDefaultConfig(__dirname), config);
 EOL
 
@@ -122,6 +124,7 @@ module.exports = {
 EOL
 
     # Update index.js
+    # [SOURCE 13]
     cat > workspace/AwesomeProject/index.js << EOL
 /**
  * @format
@@ -140,11 +143,13 @@ EOL
 else
     echo "React Native project found. Skipping initialization."
 fi
+# [SOURCE 15]
 
 # 4. Install Node.js dependencies
 echo "Installing Node.js dependencies..."
 (cd workspace/AwesomeProject && npm install)
 echo "Dependencies installed."
+
 
 echo "--- Rinse Cycle Complete ---"
 echo "Ready for repeat.bash"
