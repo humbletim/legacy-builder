@@ -80,6 +80,7 @@ EOL
 
     echo "Installing additional dependencies..."
     (cd workspace/AwesomeProject && npm install --save-dev babel-plugin-module-resolver)
+    (cd workspace/AwesomeProject && npm install --save react-native-webview @react-native-documents/picker react-native-fs)
 else
     echo "React Native project found. Skipping initialization."
 fi
