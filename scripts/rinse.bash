@@ -86,7 +86,26 @@ EOL
     # --- END NEW PINNING SCRIPT ---
 
     # --- Your existing setup continues below ---
+
+    # --- START NEW JAVA FIX ---
+    echo "Fixing Java toolchain vs. compatibility conflict..."
     
+    # This is the other build file, inside the 'app' folder
+    APP_BUILD_GRADLE="workspace/AwesomeProject/android/app/build.gradle"
+
+    # The 'npx init' template adds BOTH toolchain and compileOptions,
+    # causing a conflict. We will remove the old 'compileOptions' block.
+    # This sed command finds the line 'compileOptions {' and deletes
+    # it and the 3 lines that follow it (the entire block).
+    if [ -f "$APP_BUILD_GRADLE" ]; then
+        sed -i -E "/compileOptions \{/,+3d" "$APP_BUILD_GRADLE"
+        echo "Removed conflicting compileOptions block from $APP_BUILD_GRADLE."
+    else
+        echo "Warning: $APP_BUILD_GRADLE not found, skipping Java fix."
+    fi
+    # --- END NEW JAVA FIX ---
+
+        
     echo "Configuring project for src/ directory..."
     # Update metro.config.js
     # [SOURCE 10]
