@@ -27,6 +27,13 @@ rm -rf workspace
 mkdir -p workspace
 (cd workspace && npx @react-native-community/cli init AwesomeProject)
 
+echo "Patching AndroidManifest.xml for read permissions..."
+# Use sed to insert the permission before the <application> tag.
+# Note the use of a backup file (.bak) for macOS compatibility.
+sed -i.bak '/<application/i \
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+' workspace/AwesomeProject/android/app/src/main/AndroidManifest.xml && rm workspace/AwesomeProject/android/app/src/main/AndroidManifest.xml.bak
+
 echo "Configuring project for src/ directory..."
     # Update metro.config.js
     # [SOURCE 10]

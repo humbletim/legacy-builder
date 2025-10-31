@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, Button, StyleSheet, View, Text } from 'react-native';
+import { SafeAreaView, Button, StyleSheet, View, Text, PermissionsAndroid } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { pick, types } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs'; // react-native-fs
@@ -25,21 +25,34 @@ const App = () => {
   const loadHtmlFile = async () => {
     setError(null); // Clear previous errors
     try {
-      // 1. Let user pick an HTML file
-      const [result] = await pick({
-        type: [types.html],
-      });
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+        {
+          title: "File Access Permission",
+          message: "This app needs access to your files to load HTML.",
+          buttonNeutral: "Ask Me Later",
+          buttonNegative: "Cancel",
+          buttonPositive: "OK"
+        }
+      );
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        // 1. Let user pick an HTML file
+        const [result] = await pick({
+          type: [types.html],
+        });
 
-      // result.uri is the 'content://' path
-      const fileUri = result.uri;
+        // result.uri is the 'content://' path
+        const fileUri = result.uri;
 
-      // 2. Read the file's content from the URI
-      const content = await RNFS.readFile(fileUri, 'utf8');
+        // 2. Read the file's content from the URI
+        const content = await RNFS.readFile(fileUri, 'utf8');
 
-      // 3. Set the HTML content in state to trigger re-render
-      setBaseUrl(fileUri);
-      setHtmlContent(content);
-
+        // 3. Set the HTML content in state to trigger re-render
+        setBaseUrl(fileUri);
+        setHtmlContent(content);
+      } else {
+        setError("File access permission denied.");
+      }
     } catch (err) {
       if (err.code === 'DOCUMENT_PICKER_CANCELED') {
         // User cancelled the picker
