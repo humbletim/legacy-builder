@@ -1,0 +1,16 @@
+INFO         | Android emulator version 36.2.12.0 (build_id 14214601) (CL:N/A)
+INFO         | Graphics backend: gfxstream
+INFO         | Found systemPath /app/local/android-sdk/system-images/android-31/default/x86_64/
+WARNING      | Please update the emulator to one that supports the feature(s): Vulkan
+INFO         | Increasing RAM size to 2048MB
+INFO         | Guest GLES Driver: Auto (ext controls)
+WARNING      | Your GPU drivers may have a bug. Switching to software rendering.
+library_mode swangle_indirect gpu mode swangle_indirect
+INFO         | Checking system compatibility:
+INFO         |   Checking: hasSufficientDiskSpace
+INFO         |      Ok: Disk space requirements to run avd: `shine-avd` are met
+INFO         |   Checking: hasSufficientHwGpu
+INFO         |      Ok: Hardware GPU compatibility checks are not required
+INFO         |   Checking: hasSufficientSystem
+INFO         |      Ok: System requirements to run avd: `shine-avd` are met
+WARNING      | File System is not ext4, disable QuickbootFileBacked feature

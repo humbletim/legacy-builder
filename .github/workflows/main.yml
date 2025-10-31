@@ -43,7 +43,6 @@ jobs:
       shell: bash
 
     - name: 'Run shine.bash'
-      if: false
       run: |
         cd /d/_ && ./scripts/shine.bash
       shell: bash
@@ -56,7 +55,7 @@ jobs:
         retention-days: 5 # Optional: specify how long to keep the artifactZ
 
     - name: Setup tmate session
-      if: true #failure()
+      if: failure()
       uses: humbletim/p373r-vrmod/.github/nofrills-tmate@devtime
       env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

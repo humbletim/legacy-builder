@@ -3,6 +3,7 @@ import { SafeAreaView, Button, StyleSheet, View, Text, PermissionsAndroid } from
 import { WebView } from 'react-native-webview';
 import { pick, types } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs'; // react-native-fs
+import buildInfo from './build-info';
 
 const App = () => {
   // State to hold the HTML content, not a path
@@ -75,6 +76,11 @@ const App = () => {
           <Text style={styles.title}>My Static App Viewer</Text>
           <Button title="Load Local HTML File" onPress={loadHtmlFile} />
           {error && <Text style={styles.errorText}>{error}</Text>}
+          <View style={styles.buildInfoContainer}>
+            <Text style={styles.buildInfoText}>
+              Build: {buildInfo.date} ({buildInfo.hash})
+            </Text>
+          </View>
         </View>
       ) : (
         /* Once HTML is loaded, we show the WebView.
@@ -112,6 +118,15 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 10,
     color: 'red',
+  },
+  buildInfoContainer: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+  },
+  buildInfoText: {
+    fontSize: 10,
+    color: 'grey',
   },
 });
 

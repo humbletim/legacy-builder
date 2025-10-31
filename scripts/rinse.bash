@@ -27,12 +27,31 @@ rm -rf workspace
 mkdir -p workspace
 (cd workspace && npx @react-native-community/cli init AwesomeProject)
 
-echo "Patching AndroidManifest.xml for read permissions..."
+# --- Patch AndroidManifest.xml to add READ_EXTERNAL_STORAGE permission ---
+MANIFEST_PATH="workspace/AwesomeProject/android/app/src/main/AndroidManifest.xml"
+
+echo "Verifying AndroidManifest.xml exists at: $MANIFEST_PATH"
+if [ ! -f "$MANIFEST_PATH" ]; then
+    echo "Error: AndroidManifest.xml not found at the expected location." >&2
+    echo "The react-native init process may have changed." >&2
+    exit 1
+fi
+echo "AndroidManifest.xml found."
+
+echo "Patching AndroidManifest.xml to add read permission..."
 # Use sed to insert the permission before the <application> tag.
 # Note the use of a backup file (.bak) for macOS compatibility.
 sed -i.bak '/<application/i \
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-' workspace/AwesomeProject/android/app/src/main/AndroidManifest.xml && rm workspace/AwesomeProject/android/app/src/main/AndroidManifest.xml.bak
+' "$MANIFEST_PATH" && rm "${MANIFEST_PATH}.bak"
+
+echo "Verifying patch..."
+if ! grep -q "android.permission.READ_EXTERNAL_STORAGE" "$MANIFEST_PATH"; then
+    echo "Error: Failed to patch AndroidManifest.xml." >&2
+    echo "The permission was not added correctly." >&2
+    exit 1
+fi
+echo "AndroidManifest.xml patched and verified successfully."
 
 echo "Configuring project for src/ directory..."
     # Update metro.config.js
