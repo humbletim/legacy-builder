@@ -43,6 +43,7 @@ jobs:
       shell: bash
 
     - name: 'Run shine.bash'
+      if: false
       run: |
         cd /d/_ && ./scripts/shine.bash
       shell: bash
