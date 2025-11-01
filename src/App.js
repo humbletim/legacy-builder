@@ -1,14 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, Button, StyleSheet, View, Text, PermissionsAndroid } from 'react-native';
+import { SafeAreaView, Button, StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { pick, types } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs'; // We still need this
 import buildInfo from './build-info';
 
+const cspDefault = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; `;
+const cspNetworkAllowed = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src *; media-src *; object-src 'none'; frame-src *; `;
+
+const cspInjectionScriptBuilder = (policy) => `
+  (function() {
+    var meta = document.createElement('meta');
+    meta.httpEquiv = 'Content-Security-Policy';
+    meta.content = '${policy.replace(/\s+/g, ' ')}';
+    document.head.appendChild(meta);
+  })();
+`;
+
+const cspInjectionScriptDefault = cspInjectionScriptBuilder(cspDefault);
+const cspInjectionScriptNetworkAllowed = cspInjectionScriptBuilder(cspNetworkAllowed);
+
 const App = () => {
-  // We ONLY store the URI, not the content.
   const [fileUri, setFileUri] = useState(null);
   const [error, setError] = useState(null);
+  const [isNetworkAllowed, setIsNetworkAllowed] = useState(false);
 
   // This test file logic is still fine
   useEffect(() => {
@@ -84,11 +99,25 @@ const App = () => {
     }
   };
 
+  const Checkbox = ({ label, value, onValueChange }) => (
+    <TouchableOpacity onPress={() => onValueChange(!value)} style={styles.checkboxContainer}>
+      <View style={[styles.checkbox, value && styles.checkboxChecked]}>
+        {value && <Text style={styles.checkboxCheckmark}>✓</Text>}
+      </View>
+      <Text style={styles.checkboxLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {!fileUri ? (
         <View style={styles.menu}>
           <Text style={styles.title}>My Static App Viewer</Text>
+          <Checkbox
+            label="Allow HTTP Networking"
+            value={isNetworkAllowed}
+            onValueChange={setIsNetworkAllowed}
+          />
           <Button title="Load Local HTML File" onPress={loadHtmlFile} />
           {error && <Text style={styles.errorText}>{error}</Text>}
           <View style={styles.buildInfoContainer}>
@@ -100,17 +129,14 @@ const App = () => {
       ) : (
         <WebView
           originWhitelist={['*']}
-          source={{ uri: fileUri }} // This will now be a 'file://' URI
+          source={{ uri: fileUri }}
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          
-          // These are ESSENTIAL for file:// to work
           allowFileAccess={true}
-          allowFileAccessFromFileURLs={true}
           allowUniversalAccessFromFileURLs={true}
-          
-          // We set the baseUrl to the file URI
-          baseUrl={fileUri} 
+          allowFileAccessFromFileURLs={true}
+          baseUrl={fileUri}
+          injectedJavaScriptBeforeContentLoaded={isNetworkAllowed ? cspInjectionScriptNetworkAllowed : cspInjectionScriptDefault}
           
           renderLoading={() => (
             <View style={styles.loadingContainer}>
@@ -145,6 +171,31 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    borderRadius: 4,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#007AFF',
+  },
+  checkboxCheckmark: {
+    color: 'white',
+    fontSize: 14,
+  },
+  checkboxLabel: {
+    fontSize: 16,
   },
   errorText: {
     marginTop: 10,

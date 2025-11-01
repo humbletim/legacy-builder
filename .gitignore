@@ -27,3 +27,4 @@ dist/
 .vscode/
 *.iml
 *.DS_Store
+src/build-info.js
