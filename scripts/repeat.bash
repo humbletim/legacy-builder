@@ -40,6 +40,10 @@ echo "Bundling React Native code and assets..."
 
 # 3. Build the Android application
 echo "Building the Android application (release)..."
+
+# ensure changes to src/* get picked up if rebuilding
+(cd workspace/AwesomeProject && rm android/app/build -rf || true)
+
 (cd workspace/AwesomeProject/android && ./gradlew assembleRelease)
 
 # 4. Copy the APK to the dist folder
