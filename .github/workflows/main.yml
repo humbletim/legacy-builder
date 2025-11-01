@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ feat/react-native ]
   workflow_dispatch:
+    inputs:
+      timeout:
+        description: 'Timeout in seconds AWAITING initial SSH connection.'
+        required: false
+        default: 300
 
 jobs:
   build:
@@ -61,5 +66,5 @@ jobs:
       env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        timeout: 600
+        timeout: ${{ inputs.timeout }}
         limit-access-to-actor: true
