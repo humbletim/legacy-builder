@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, Button, StyleSheet, View, Text, PermissionsAndroid } from 'react-native';
+import { SafeAreaView, Button, StyleSheet, View, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { pick, types } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs'; // react-native-fs
@@ -23,49 +23,42 @@ const App = () => {
     checkTestFile();
   }, []);
 
-  const loadHtmlFile = async () => {
+ const loadHtmlFile = async () => {
     setError(null); // Clear previous errors
     try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        {
-          title: "File Access Permission",
-          message: "This app needs access to your files to load HTML.",
-          buttonNeutral: "Ask Me Later",
-          buttonNegative: "Cancel",
-          buttonPositive: "OK"
-        }
-      );
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        // 1. Let user pick an HTML file
-        const [result] = await pick({
-          type: [types.html],
-        });
+      // 1. Let user pick an HTML file
+      const [result] = await pick({
+        // THIS IS THE FIX:
+        // Use a generic type because [types.html] is too specific
+        // and causes a native crash on many systems.
+        type: [types.allFiles], 
+        copyTo: 'cachesDirectory', // Keep this from the (correct) previous suggestion
+      });
 
-        // result.uri is the 'content://' path
-        const fileUri = result.uri;
-
-        // 2. Read the file's content from the URI
-        const content = await RNFS.readFile(fileUri, 'utf8');
-
-        // 3. Set the HTML content in state to trigger re-render
-        setBaseUrl(fileUri);
-        setHtmlContent(content);
-      } else {
-        setError("File access permission denied.");
+      setError('load file: ' + [result.fileCopyUri, result.uri]);
+      if (!result.fileCopyUri) {
+        throw new Error('Failed to copy file to cache.');
       }
+
+      // 2. Read the file's content from the local cache copy
+      const content = await RNFS.readFile(result.fileCopyUri, 'utf8');
+
+      // 3. Set the HTML content in state
+      setBaseUrl(result.uri); // Use original URI for baseUrl
+      setHtmlContent(content);
+
     } catch (err) {
+      setError('Failed to load file. Error: ' + err.message);
       if (err.code === 'DOCUMENT_PICKER_CANCELED') {
         // User cancelled the picker
         console.log('User cancelled picker');
       } else {
         // Handle other errors
         console.error('Unknown Error: ', err);
-        setError('Failed to load file. Please try again.');
       }
     }
   };
-
+  
   return (
     <SafeAreaView style={styles.container}>
       {/* This is a simple "main menu"
