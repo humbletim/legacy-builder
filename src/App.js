@@ -1,70 +1,92 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, Button, StyleSheet, View, Text } from 'react-native';
+import { SafeAreaView, Button, StyleSheet, View, Text, PermissionsAndroid } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { pick, types } from '@react-native-documents/picker';
-import RNFS from 'react-native-fs'; // react-native-fs
+import RNFS from 'react-native-fs'; // We still need this
 import buildInfo from './build-info';
 
 const App = () => {
-  // State to hold the HTML content, not a path
-  const [htmlContent, setHtmlContent] = useState(null);
-  const [baseUrl, setBaseUrl] = useState('');
+  // We ONLY store the URI, not the content.
+  const [fileUri, setFileUri] = useState(null);
   const [error, setError] = useState(null);
 
+  // This test file logic is still fine
   useEffect(() => {
     const testModePath = RNFS.DownloadDirectoryPath + '/test.html';
     const checkTestFile = async () => {
-      if (await RNFS.exists(testModePath)) {
-        const content = await RNFS.readFile(testModePath, 'utf8');
-        setBaseUrl('file://' + testModePath);
-        setHtmlContent(content);
+      try {
+        if (await RNFS.exists(testModePath)) {
+          console.log('Test file found, loading it.');
+          setFileUri('file://' + testModePath);
+        } else {
+          console.log('Test file not found.');
+        }
+      } catch (e) {
+        console.error('Test file check failed:', e);
       }
     };
     checkTestFile();
   }, []);
 
- const loadHtmlFile = async () => {
-    setError(null); // Clear previous errors
+  const loadHtmlFile = async () => {
+    console.log('--- loadHtmlFile started ---');
+    setError(null);
+    
+    let pickResult;
     try {
-      // 1. Let user pick an HTML file
+      console.log('Attempting to call pick() with types.allFiles...');
       const [result] = await pick({
-        // THIS IS THE FIX:
-        // Use a generic type because [types.html] is too specific
-        // and causes a native crash on many systems.
-        type: [types.allFiles], 
-        copyTo: 'cachesDirectory', // Keep this from the (correct) previous suggestion
+        type: [types.allFiles],
       });
-
-      setError('load file: ' + [result.fileCopyUri, result.uri]);
-      if (!result.fileCopyUri) {
-        throw new Error('Failed to copy file to cache.');
-      }
-
-      // 2. Read the file's content from the local cache copy
-      const content = await RNFS.readFile(result.fileCopyUri, 'utf8');
-
-      // 3. Set the HTML content in state
-      setBaseUrl(result.uri); // Use original URI for baseUrl
-      setHtmlContent(content);
-
-    } catch (err) {
-      setError('Failed to load file. Error: ' + err.message);
-      if (err.code === 'DOCUMENT_PICKER_CANCELED') {
-        // User cancelled the picker
-        console.log('User cancelled picker');
+      console.log('pick() successful.');
+      pickResult = result;
+    } catch (pickError) {
+      if (pickError.code === 'DOCUMENT_PICKER_CANCELED') {
+        console.log('User cancelled the picker.');
+        setError('File selection was cancelled.');
       } else {
-        // Handle other errors
-        console.error('Unknown Error: ', err);
+        console.error('!!! ERROR in pick() step:', pickError);
+        setError('Failed during file pick step: ' + pickError.message);
       }
+      return;
+    }
+
+    if (!pickResult || !pickResult.uri) {
+      console.error('!!! ERROR: pickResult is invalid or has no URI.');
+      setError('File picker returned an invalid result.');
+      return;
+    }
+
+    console.log(`Source URI is: ${pickResult.uri}`);
+    const sourceUri = pickResult.uri;
+    let localFile;
+
+    // 2. MANUALLY COPY THE FILE (We know this is fast)
+    try {
+      localFile = `${RNFS.CachesDirectoryPath}/${Date.now()}_picked_file.html`;
+      console.log(`Attempting RNFS.copyFile from ${sourceUri} to ${localFile}`);
+      await RNFS.copyFile(sourceUri, localFile);
+      console.log('RNFS.copyFile successful.');
+    } catch (copyError) {
+      console.error('!!! ERROR in RNFS.copyFile step:', copyError);
+      setError('Failed to copy file from picker: ' + copyError.message);
+      return;
+    }
+
+    // 3. SET THE *LOCAL FILE* URI (NOT the content:// URI)
+    try {
+      console.log(`Attempting to setFileUri to: 'file://${localFile}'`);
+      setFileUri('file://' + localFile);
+      console.log('--- loadHtmlFile successful! ---');
+    } catch (stateError) {
+      console.error('!!! ERROR setting state:', stateError);
+      setError('Failed to display file: ' + stateError.message);
     }
   };
-  
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* This is a simple "main menu"
-        We show the button if no HTML is loaded.
-      */}
-      {!htmlContent ? (
+      {!fileUri ? (
         <View style={styles.menu}>
           <Text style={styles.title}>My Static App Viewer</Text>
           <Button title="Load Local HTML File" onPress={loadHtmlFile} />
@@ -76,17 +98,33 @@ const App = () => {
           </View>
         </View>
       ) : (
-        /* Once HTML is loaded, we show the WebView.
-          Note we use 'source={{ html: ... }}'
-        */
         <WebView
-          originWhitelist={['*']} // Allows all origins
-          source={{ html: htmlContent, baseUrl: baseUrl }} // baseUrl is good practice
+          originWhitelist={['*']}
+          source={{ uri: fileUri }} // This will now be a 'file://' URI
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          // Add props here for sensor access if your HTML needs it
-          // mediaPlaybackRequiresUserAction={false} // for <audio>
-          // geolocationEnabled={true} // for location
+          
+          // These are ESSENTIAL for file:// to work
+          allowFileAccess={true}
+          allowFileAccessFromFileURLs={true}
+          allowUniversalAccessFromFileURLs={true}
+          
+          // We set the baseUrl to the file URI
+          baseUrl={fileUri} 
+          
+          renderLoading={() => (
+            <View style={styles.loadingContainer}>
+              <Text>Loading File...</Text>
+            </View>
+          )}
+          startInLoadingState={true}
+          
+          onError={(syntheticEvent) => {
+            const {nativeEvent} = syntheticEvent;
+            console.error('!!! WebView error: ', nativeEvent);
+            setError(`WebView Error: ${nativeEvent.description}`);
+            setFileUri(null); // Go back to menu
+          }}
         />
       )}
     </SafeAreaView>
@@ -120,6 +158,16 @@ const styles = StyleSheet.create({
   buildInfoText: {
     fontSize: 10,
     color: 'grey',
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
