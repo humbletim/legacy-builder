@@ -8,12 +8,20 @@ import buildInfo from './build-info';
 const cspDefault = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; `;
 const cspNetworkAllowed = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src *; media-src *; object-src 'none'; frame-src *; `;
 
+//
+// --- THIS IS THE CORRECTED FUNCTION ---
+//
 const cspInjectionScriptBuilder = (policy) => `
   (function() {
-    var meta = document.createElement('meta');
-    meta.httpEquiv = 'Content-Security-Policy';
-    meta.content = '${policy.replace(/\s+/g, ' ')}';
-    document.head.appendChild(meta);
+    try {
+      var meta = document.createElement('meta');
+      meta.httpEquiv = 'Content-Security-Policy';
+      // Use JSON.stringify to safely embed the policy as a JS string
+      meta.content = ${JSON.stringify(policy.replace(/\s+/g, ' '))};
+      document.head.appendChild(meta);
+    } catch (e) {
+      console.error('CSP Injection Error:', e.message);
+    }
   })();
 `;
 
