@@ -61,4 +61,5 @@ jobs:
       env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
+        timeout: 600
         limit-access-to-actor: true
