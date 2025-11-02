@@ -5,29 +5,6 @@ import { pick, types } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs'; // We still need this
 import buildInfo from './build-info';
 
-const cspDefault = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; `;
-const cspNetworkAllowed = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src *; media-src *; object-src 'none'; frame-src *; `;
-
-//
-// --- THIS IS THE CORRECTED FUNCTION ---
-//
-const cspInjectionScriptBuilder = (policy) => `
-  (function() {
-    try {
-      var meta = document.createElement('meta');
-      meta.httpEquiv = 'Content-Security-Policy';
-      // Use JSON.stringify to safely embed the policy as a JS string
-      meta.content = ${JSON.stringify(policy.replace(/\s+/g, ' '))};
-      document.head.appendChild(meta);
-    } catch (e) {
-      console.error('CSP Injection Error:', e.message);
-    }
-  })();
-`;
-
-const cspInjectionScriptDefault = cspInjectionScriptBuilder(cspDefault);
-const cspInjectionScriptNetworkAllowed = cspInjectionScriptBuilder(cspNetworkAllowed);
-
 const App = () => {
   const [fileUri, setFileUri] = useState(null);
   const [error, setError] = useState(null);
@@ -50,6 +27,34 @@ const App = () => {
     };
     checkTestFile();
   }, []);
+
+
+
+
+const onShouldStartLoad = (request) => {
+  const { url } = request;
+
+  // 1. Always allow the *very first* load of the local file itself
+  //    (This is the most important rule!)
+  if (url === fileUri) {
+    return true;
+  }
+
+  // 2. If networking is DISALLOWED
+  if (!isNetworkAllowed) {
+    // 3. Block any request that is NOT a local file
+    //    (You might want to refine this, but 'http' covers 99%)
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      console.log('CSP-BLOCK (via onShouldStartLoad):', url);
+      return false; // <-- THE BLOCK
+    }
+  }
+
+  // 4. Otherwise (networking is allowed, or it's a local file-to-file request),
+  //    allow the request to proceed.
+  return true;
+};
+
 
   const loadHtmlFile = async () => {
     console.log('--- loadHtmlFile started ---');
@@ -144,8 +149,7 @@ const App = () => {
           allowUniversalAccessFromFileURLs={true}
           allowFileAccessFromFileURLs={true}
           baseUrl={fileUri}
-          injectedJavaScriptBeforeContentLoaded={isNetworkAllowed ? cspInjectionScriptNetworkAllowed : cspInjectionScriptDefault}
-          
+          onShouldStartLoadWithRequest={onShouldStartLoad}
           renderLoading={() => (
             <View style={styles.loadingContainer}>
               <Text>Loading File...</Text>
