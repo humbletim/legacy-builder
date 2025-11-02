@@ -5,31 +5,67 @@ import { pick, types } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs'; // We still need this
 import buildInfo from './build-info';
 
-// CSP policies remain the same
-const cspDefault = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; `;
-const cspNetworkAllowed = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src *; media-src *; object-src 'none'; frame-src *; `;
+// Your fixed CSP recipes (these are perfect)
+const cspDefault = `
+  default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval';
+  connect-src 'none';
+`;
+const cspNetworkAllowed = `
+  default-src * data: blob: 'unsafe-inline' 'unsafe-eval';
+`;
 
 /**
- * Creates the tiny host HTML page that contains the sandboxed iframe.
+ * Creates the tiny host HTML page.
+ * This page's only job is to fetch the *real* content and
+ * document.write() it with the CSP tag prepended.
  */
 const createHostHtml = (fileUri, networkAllowed) => {
   const policy = networkAllowed ? cspNetworkAllowed : cspDefault;
-  // We must escape quotes for the HTML attribute
-  const safePolicy = policy.replace(/"/g, '&quot;');
+  // Make the policy safe for a JS string
+  const jsSafePolicy = policy.replace(/\s+/g, ' ').trim();
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Secure Host</title>
+      <title>Loading...</title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
-        iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+        body, html { 
+          margin: 0; padding: 0; height: 100%; width: 100%; 
+          display: flex; justify-content: center; align-items: center;
+          font-family: sans-serif; background-color: #f0f0f0;
+        }
       </style>
     </head>
     <body>
-      <iframe src="${fileUri}" csp="${safePolicy}"></iframe>
+      <p>Loading Content...</p>
+      
+      <script>
+        (async () => {
+          const fileUri = '${fileUri}';
+          const cspPolicy = '${jsSafePolicy}';
+          const cspTag = '<meta http-equiv="Content-Security-Policy" content="' + cspPolicy + '">';
+
+          try {
+            console.log('Fetching content from: ' + fileUri);
+            const response = await fetch(fileUri);
+            if (!response.ok) {
+              throw new Error('Failed to fetch file: ' + response.statusText);
+            }
+            const html = await response.text();
+            
+            console.log('Content fetched, writing to document...');
+            document.open();
+            // Write the CSP tag FIRST, then the rest of the HTML
+            document.write(cspTag + html);
+            document.close();
+          } catch (e) {
+            console.error('Failed to load content:', e);
+            document.body.innerHTML = '<h1>Error</h1><p>' + e.message + '</p>';
+          }
+        })();
+      </script>
     </body>
     </html>
   `;
@@ -40,8 +76,6 @@ const App = () => {
   const [fileUri, setFileUri] = useState(null); // This will be the file:///... URI
   const [error, setError] = useState(null);
   const [isNetworkAllowed, setIsNetworkAllowed] = useState(false);
-
-  // This will hold the tiny host HTML string
   const [hostHtml, setHostHtml] = useState(null);
 
   // When fileUri or policy changes, regenerate the host HTML
@@ -53,16 +87,8 @@ const App = () => {
     }
   }, [fileUri, isNetworkAllowed]);
 
-
-  /**
-   * This function ONLY copies the file and sets the URI.
-   * No reading or writing of large strings.
-   */
   const loadHtmlFile = async (isTestFile = false) => {
-    // This is the fix for the event handler bug you spotted.
-    // If isTestFile is not explicitly true, it's a button press.
     const isTest = isTestFile === true;
-    
     console.log('--- loadHtmlFile started ---');
     setError(null);
     
@@ -76,26 +102,25 @@ const App = () => {
           console.log('Loading test file...');
           sourceUri = 'file://' + testModePath;
           localFile = `${RNFS.CachesDirectoryPath}/test_file_processed.html`;
-        } else {
-          console.log('Test file not found.');
-          return;
-        }
-      } catch (e) {
-        console.error('Test file check failed:', e);
-        return;
-      }
+        } else { return; }
+      } catch (e) { return; }
     } else {
       let pickResult;
       try {
-        console.log('Attempting to call pick() with types.allFiles...');
         const [result] = await pick({ type: [types.allFiles] });
         pickResult = result;
       } catch (pickError) {
-        // ... (your existing picker error handling is perfect)
+        if (pickError.code === 'DOCUMENT_PICKER_CANCELED') {
+          setError('File selection was cancelled.');
+        } else {
+          setError('Failed during file pick step: ' + pickError.message);
+        }
         return;
       }
-      if (!pickResult || !pickResult.uri) { return; }
-
+      if (!pickResult || !pickResult.uri) { 
+        setError('File picker returned an invalid result.');
+        return; 
+      }
       sourceUri = pickResult.uri;
       localFile = `${RNFS.CachesDirectoryPath}/${Date.now()}_picked_file.html`;
     }
@@ -106,7 +131,7 @@ const App = () => {
       await RNFS.copyFile(sourceUri, localFile);
       console.log('RNFS.copyFile successful.');
       
-      // 2. SET THE URI. This triggers the useEffect.
+      // 2. SET THE URI. This triggers the useEffect to build the host HTML.
       setFileUri('file://' + localFile);
       console.log('--- loadHtmlFile successful! ---');
 
@@ -118,9 +143,7 @@ const App = () => {
 
   // Auto-load test file on mount
   useEffect(() => {
-    // We add the '0 &&' you did to disable auto-load for now
-    // To re-enable, remove the '0 &&'
-    if (0 && !fileUri) { 
+    if (0 && !fileUri) { // Disabled as you had it
       loadHtmlFile(true);
     }
   }, []);
@@ -136,7 +159,6 @@ const App = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* We now check for hostHtml, not fileUri */}
       {!hostHtml ? (
         <View style={styles.menu}>
           <Text style={styles.title}>My Static App Viewer</Text>
@@ -145,7 +167,6 @@ const App = () => {
             value={isNetworkAllowed}
             onValueChange={setIsNetworkAllowed}
           />
-          {/* This correctly calls loadHtmlFile with no arguments */}
           <Button title="Load Local HTML File" onPress={loadHtmlFile} />
           {error && <Text style={styles.errorText}>{error}</Text>}
           <View style={styles.buildInfoContainer}>
@@ -163,9 +184,11 @@ const App = () => {
           
           javaScriptEnabled={true}
           domStorageEnabled={true}
+          
+          // The critical props that make the in-page fetch() work
           allowFileAccess={true}
-          allowUniversalAccessFromFileURLs={true}
           allowFileAccessFromFileURLs={true}
+          allowUniversalAccessFromFileURLs={true} // Needed for file:// to fetch
           
           renderLoading={() => (
             <View style={styles.loadingContainer}>
