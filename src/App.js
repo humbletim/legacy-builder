@@ -14,18 +14,19 @@ const cspNetworkAllowed = `
   default-src * data: blob: 'unsafe-inline' 'unsafe-eval';
 `;
 
+
+
 /**
  * Creates the tiny host HTML page with ROBUST LOGGING.
+ * This version uses XMLHttpRequest instead of fetch(), as fetch()
+ * blocks file:// access on Android regardless of webview props.
  */
 const createHostHtml = (fileUri, networkAllowed) => {
   const policy = networkAllowed ? cspNetworkAllowed : cspDefault;
 
-  // --- THIS IS THE FIX ---
-  // JSON.stringify will turn the strings into valid JS string literals,
-  // complete with outer double-quotes and escaped internal characters.
+  // Use JSON.stringify to safely embed these in the JS
   const jsSafePolicy = JSON.stringify(policy.replace(/\s+/g, ' ').trim());
   const jsSafeFileUri = JSON.stringify(fileUri);
-  // --- END FIX ---
 
   return `
     <!DOCTYPE html>
@@ -48,12 +49,7 @@ const createHostHtml = (fileUri, networkAllowed) => {
       
       <script>
         const logEl = document.getElementById('logs');
-        
-        // --- Visible Logger ---
-        function log(msg) {
-          console.log(msg);
-          logEl.innerHTML += '<div class="log">' + msg + '</div>';
-        }
+        function log(msg) { console.log(msg); logEl.innerHTML += '<div class="log">' + msg + '</div>'; }
         function error(msg, e) {
           console.error(msg, e);
           let errorMsg = e ? e.message : 'Unknown error';
@@ -63,47 +59,55 @@ const createHostHtml = (fileUri, networkAllowed) => {
                              '<pre>Stack: ' + stack + '</pre></div>';
           document.body.style.backgroundColor = '#FFD2D2';
         }
-        // --- End Logger ---
 
-        (async () => {
+        // --- Use XHR Loader, not fetch ---
+        function loadContent(fileUri, cspPolicy) {
           try {
             log('Script started.');
-            
-            // We inject the JSON string *directly*, without extra quotes
-            const fileUri = ${jsSafeFileUri};
-            const cspPolicy = ${jsSafePolicy};
-            
             const cspTag = '<meta http-equiv="Content-Security-Policy" content="' + cspPolicy + '">';
-            
             log('File URI: ' + fileUri);
             log('CSP: ' + cspPolicy);
 
-            log('Fetching content...');
-            const response = await fetch(fileUri);
-            log('Fetch response received: ' + response.status + ' ' + response.statusText);
+            log('Creating XMLHttpRequest...');
+            const xhr = new XMLHttpRequest();
+            
+            xhr.onload = function() {
+              log('XHR request completed with status: ' + xhr.status);
+              if (xhr.status === 200 || (xhr.status === 0 && xhr.responseText)) { // 0 can be success for file://
+                const html = xhr.responseText;
+                log('Got ' + (html ? html.length : 0) + ' bytes of HTML.');
+                
+                log('Calling document.open()...');
+                document.open();
+                log('Writing CSP tag...');
+                document.write(cspTag);
+                log('Writing HTML content...');
+                document.write(html);
+                log('Calling document.close()...');
+                document.close();
+              } else {
+                throw new Error('XHR failed with status ' + xhr.status);
+              }
+            };
 
-            if (!response.ok) {
-              throw new Error('Fetch failed with status ' + response.status);
-            }
-            
-            log('Getting response text...');
-            const html = await response.text();
-            log('Got ' + (html ? html.length : 0) + ' bytes of HTML.');
-            
-            log('Calling document.open()...');
-            document.open();
-            log('Writing CSP tag...');
-            document.write(cspTag);
-            log('Writing HTML content...');
-            document.write(html);
-            log('Calling document.close()...');
-            document.close();
-            // Note: This log will not be seen, as the document is replaced.
+            xhr.onerror = function() {
+              log('XHR request.onerror triggered.');
+              throw new Error('XHR request failed (onerror).');
+            };
+
+            xhr.open('GET', fileUri);
+            log('Sending XHR request...');
+            xhr.send();
 
           } catch (e) {
             error('CRITICAL ERROR in loader script:', e);
           }
-        })();
+        }
+
+        const policy = ${jsSafePolicy};
+        const uri = ${jsSafeFileUri};
+        loadContent(uri, policy);
+        
       </script>
     </body>
     </html>
