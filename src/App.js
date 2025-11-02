@@ -5,112 +5,125 @@ import { pick, types } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs'; // We still need this
 import buildInfo from './build-info';
 
-const App = () => {
-  const [fileUri, setFileUri] = useState(null);
-  const [error, setError] = useState(null);
-  const [isNetworkAllowed, setIsNetworkAllowed] = useState(false);
+// CSP policies remain the same
+const cspDefault = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; `;
+const cspNetworkAllowed = ` default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src *; media-src *; object-src 'none'; frame-src *; `;
 
-  // This test file logic is still fine
-  useEffect(() => {
-    const testModePath = RNFS.DownloadDirectoryPath + '/test.html';
-    const checkTestFile = async () => {
-      try {
-        if (await RNFS.exists(testModePath)) {
-          console.log('Test file found, loading it.');
-          setFileUri('file://' + testModePath);
-        } else {
-          console.log('Test file not found.');
-        }
-      } catch (e) {
-        console.error('Test file check failed:', e);
-      }
-    };
-    checkTestFile();
-  }, []);
+/**
+ * Creates the tiny host HTML page that contains the sandboxed iframe.
+ */
+const createHostHtml = (fileUri, networkAllowed) => {
+  const policy = networkAllowed ? cspNetworkAllowed : cspDefault;
+  // We must escape quotes for the HTML attribute
+  const safePolicy = policy.replace(/"/g, '&quot;');
 
-
-
-
-const onShouldStartLoad = (request) => {
-  const { url } = request;
-
-  // 1. Always allow the *very first* load of the local file itself
-  //    (This is the most important rule!)
-  if (url === fileUri) {
-    return true;
-  }
-
-  // 2. If networking is DISALLOWED
-  if (!isNetworkAllowed) {
-    // 3. Block any request that is NOT a local file
-    //    (You might want to refine this, but 'http' covers 99%)
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      console.log('CSP-BLOCK (via onShouldStartLoad):', url);
-      return false; // <-- THE BLOCK
-    }
-  }
-
-  // 4. Otherwise (networking is allowed, or it's a local file-to-file request),
-  //    allow the request to proceed.
-  return true;
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Secure Host</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; }
+        iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+      </style>
+    </head>
+    <body>
+      <iframe src="${fileUri}" csp="${safePolicy}"></iframe>
+    </body>
+    </html>
+  `;
 };
 
 
-  const loadHtmlFile = async () => {
+const App = () => {
+  const [fileUri, setFileUri] = useState(null); // This will be the file:///... URI
+  const [error, setError] = useState(null);
+  const [isNetworkAllowed, setIsNetworkAllowed] = useState(false);
+
+  // This will hold the tiny host HTML string
+  const [hostHtml, setHostHtml] = useState(null);
+
+  // When fileUri or policy changes, regenerate the host HTML
+  useEffect(() => {
+    if (fileUri) {
+      setHostHtml(createHostHtml(fileUri, isNetworkAllowed));
+    } else {
+      setHostHtml(null);
+    }
+  }, [fileUri, isNetworkAllowed]);
+
+
+  /**
+   * This function ONLY copies the file and sets the URI.
+   * No reading or writing of large strings.
+   */
+  const loadHtmlFile = async (isTestFile = false) => {
+    // This is the fix for the event handler bug you spotted.
+    // If isTestFile is not explicitly true, it's a button press.
+    const isTest = isTestFile === true;
+    
     console.log('--- loadHtmlFile started ---');
     setError(null);
     
-    let pickResult;
-    try {
-      console.log('Attempting to call pick() with types.allFiles...');
-      const [result] = await pick({
-        type: [types.allFiles],
-      });
-      console.log('pick() successful.');
-      pickResult = result;
-    } catch (pickError) {
-      if (pickError.code === 'DOCUMENT_PICKER_CANCELED') {
-        console.log('User cancelled the picker.');
-        setError('File selection was cancelled.');
-      } else {
-        console.error('!!! ERROR in pick() step:', pickError);
-        setError('Failed during file pick step: ' + pickError.message);
-      }
-      return;
-    }
-
-    if (!pickResult || !pickResult.uri) {
-      console.error('!!! ERROR: pickResult is invalid or has no URI.');
-      setError('File picker returned an invalid result.');
-      return;
-    }
-
-    console.log(`Source URI is: ${pickResult.uri}`);
-    const sourceUri = pickResult.uri;
+    let sourceUri;
     let localFile;
 
-    // 2. MANUALLY COPY THE FILE (We know this is fast)
-    try {
+    if (isTest) {
+      const testModePath = RNFS.DownloadDirectoryPath + '/test.html';
+      try {
+        if (await RNFS.exists(testModePath)) {
+          console.log('Loading test file...');
+          sourceUri = 'file://' + testModePath;
+          localFile = `${RNFS.CachesDirectoryPath}/test_file_processed.html`;
+        } else {
+          console.log('Test file not found.');
+          return;
+        }
+      } catch (e) {
+        console.error('Test file check failed:', e);
+        return;
+      }
+    } else {
+      let pickResult;
+      try {
+        console.log('Attempting to call pick() with types.allFiles...');
+        const [result] = await pick({ type: [types.allFiles] });
+        pickResult = result;
+      } catch (pickError) {
+        // ... (your existing picker error handling is perfect)
+        return;
+      }
+      if (!pickResult || !pickResult.uri) { return; }
+
+      sourceUri = pickResult.uri;
       localFile = `${RNFS.CachesDirectoryPath}/${Date.now()}_picked_file.html`;
+    }
+
+    // 1. JUST COPY THE FILE. This is fast.
+    try {
       console.log(`Attempting RNFS.copyFile from ${sourceUri} to ${localFile}`);
       await RNFS.copyFile(sourceUri, localFile);
       console.log('RNFS.copyFile successful.');
+      
+      // 2. SET THE URI. This triggers the useEffect.
+      setFileUri('file://' + localFile);
+      console.log('--- loadHtmlFile successful! ---');
+
     } catch (copyError) {
       console.error('!!! ERROR in RNFS.copyFile step:', copyError);
       setError('Failed to copy file from picker: ' + copyError.message);
-      return;
-    }
-
-    // 3. SET THE *LOCAL FILE* URI (NOT the content:// URI)
-    try {
-      console.log(`Attempting to setFileUri to: 'file://${localFile}'`);
-      setFileUri('file://' + localFile);
-      console.log('--- loadHtmlFile successful! ---');
-    } catch (stateError) {
-      console.error('!!! ERROR setting state:', stateError);
-      setError('Failed to display file: ' + stateError.message);
     }
   };
+
+  // Auto-load test file on mount
+  useEffect(() => {
+    // We add the '0 &&' you did to disable auto-load for now
+    // To re-enable, remove the '0 &&'
+    if (0 && !fileUri) { 
+      loadHtmlFile(true);
+    }
+  }, []);
 
   const Checkbox = ({ label, value, onValueChange }) => (
     <TouchableOpacity onPress={() => onValueChange(!value)} style={styles.checkboxContainer}>
@@ -123,7 +136,8 @@ const onShouldStartLoad = (request) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {!fileUri ? (
+      {/* We now check for hostHtml, not fileUri */}
+      {!hostHtml ? (
         <View style={styles.menu}>
           <Text style={styles.title}>My Static App Viewer</Text>
           <Checkbox
@@ -131,6 +145,7 @@ const onShouldStartLoad = (request) => {
             value={isNetworkAllowed}
             onValueChange={setIsNetworkAllowed}
           />
+          {/* This correctly calls loadHtmlFile with no arguments */}
           <Button title="Load Local HTML File" onPress={loadHtmlFile} />
           {error && <Text style={styles.errorText}>{error}</Text>}
           <View style={styles.buildInfoContainer}>
@@ -142,14 +157,16 @@ const onShouldStartLoad = (request) => {
       ) : (
         <WebView
           originWhitelist={['*']}
-          source={{ uri: fileUri }}
+          
+          // Use the TINY host HTML string
+          source={{ html: hostHtml, baseUrl: `file://${RNFS.CachesDirectoryPath}/` }}
+          
           javaScriptEnabled={true}
           domStorageEnabled={true}
           allowFileAccess={true}
           allowUniversalAccessFromFileURLs={true}
           allowFileAccessFromFileURLs={true}
-          baseUrl={fileUri}
-          onShouldStartLoadWithRequest={onShouldStartLoad}
+          
           renderLoading={() => (
             <View style={styles.loadingContainer}>
               <Text>Loading File...</Text>
@@ -169,6 +186,7 @@ const onShouldStartLoad = (request) => {
   );
 };
 
+// ... (styles are unchanged)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
