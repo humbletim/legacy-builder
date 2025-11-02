@@ -15,14 +15,17 @@ const cspNetworkAllowed = `
 `;
 
 /**
- * Creates the tiny host HTML page.
- * This page's only job is to fetch the *real* content and
- * document.write() it with the CSP tag prepended.
+ * Creates the tiny host HTML page with ROBUST LOGGING.
  */
 const createHostHtml = (fileUri, networkAllowed) => {
   const policy = networkAllowed ? cspNetworkAllowed : cspDefault;
-  // Make the policy safe for a JS string
-  const jsSafePolicy = policy.replace(/\s+/g, ' ').trim();
+
+  // --- THIS IS THE FIX ---
+  // JSON.stringify will turn the strings into valid JS string literals,
+  // complete with outer double-quotes and escaped internal characters.
+  const jsSafePolicy = JSON.stringify(policy.replace(/\s+/g, ' ').trim());
+  const jsSafeFileUri = JSON.stringify(fileUri);
+  // --- END FIX ---
 
   return `
     <!DOCTYPE html>
@@ -31,38 +34,74 @@ const createHostHtml = (fileUri, networkAllowed) => {
       <title>Loading...</title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <style>
-        body, html { 
-          margin: 0; padding: 0; height: 100%; width: 100%; 
-          display: flex; justify-content: center; align-items: center;
-          font-family: sans-serif; background-color: #f0f0f0;
-        }
+        body, html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; background-color: #fff; }
+        h1 { margin: 10px; font-size: 1.2em; }
+        #logs { margin: 10px; border: 1px solid #ccc; background-color: #f9f9f9; padding: 10px; }
+        .log { font-family: monospace; font-size: 0.9em; border-bottom: 1px solid #eee; padding: 4px 2px; }
+        .error { color: #D8000C; font-weight: bold; background-color: #FFD2D2; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
       </style>
     </head>
     <body>
-      <p>Loading Content...</p>
+      <h1>Loading Content...</h1>
+      <div id="logs"></div>
       
       <script>
-        (async () => {
-          const fileUri = '${fileUri}';
-          const cspPolicy = '${jsSafePolicy}';
-          const cspTag = '<meta http-equiv="Content-Security-Policy" content="' + cspPolicy + '">';
+        const logEl = document.getElementById('logs');
+        
+        // --- Visible Logger ---
+        function log(msg) {
+          console.log(msg);
+          logEl.innerHTML += '<div class="log">' + msg + '</div>';
+        }
+        function error(msg, e) {
+          console.error(msg, e);
+          let errorMsg = e ? e.message : 'Unknown error';
+          let stack = e ? e.stack : 'No stack trace';
+          logEl.innerHTML += '<div class="log error">' + msg + 
+                             '<br><pre>Message: ' + errorMsg + '</pre>' +
+                             '<pre>Stack: ' + stack + '</pre></div>';
+          document.body.style.backgroundColor = '#FFD2D2';
+        }
+        // --- End Logger ---
 
+        (async () => {
           try {
-            console.log('Fetching content from: ' + fileUri);
-            const response = await fetch(fileUri);
-            if (!response.ok) {
-              throw new Error('Failed to fetch file: ' + response.statusText);
-            }
-            const html = await response.text();
+            log('Script started.');
             
-            console.log('Content fetched, writing to document...');
+            // We inject the JSON string *directly*, without extra quotes
+            const fileUri = ${jsSafeFileUri};
+            const cspPolicy = ${jsSafePolicy};
+            
+            const cspTag = '<meta http-equiv="Content-Security-Policy" content="' + cspPolicy + '">';
+            
+            log('File URI: ' + fileUri);
+            log('CSP: ' + cspPolicy);
+
+            log('Fetching content...');
+            const response = await fetch(fileUri);
+            log('Fetch response received: ' + response.status + ' ' + response.statusText);
+
+            if (!response.ok) {
+              throw new Error('Fetch failed with status ' + response.status);
+            }
+            
+            log('Getting response text...');
+            const html = await response.text();
+            log('Got ' + (html ? html.length : 0) + ' bytes of HTML.');
+            
+            log('Calling document.open()...');
             document.open();
-            // Write the CSP tag FIRST, then the rest of the HTML
-            document.write(cspTag + html);
+            log('Writing CSP tag...');
+            document.write(cspTag);
+            log('Writing HTML content...');
+            document.write(html);
+            log('Calling document.close()...');
             document.close();
+            // Note: This log will not be seen, as the document is replaced.
+
           } catch (e) {
-            console.error('Failed to load content:', e);
-            document.body.innerHTML = '<h1>Error</h1><p>' + e.message + '</p>';
+            error('CRITICAL ERROR in loader script:', e);
           }
         })();
       </script>
@@ -276,3 +315,4 @@ const styles = StyleSheet.create({
 });
 
 export default App;
+
